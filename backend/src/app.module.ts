@@ -1,11 +1,47 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LoggerModule } from 'nestjs-pino';
 import { HealthModule } from './health/health.module';
+import { RedisModule } from './redis/redis.module';
+import configuration from './config/configuration';
+import { envValidationSchema } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        pinoHttp: {
+          level:
+            configService.get<string>('env') === 'production'
+              ? 'info'
+              : 'debug',
+          transport:
+            configService.get<string>('env') !== 'production'
+              ? {
+                  target: 'pino-pretty',
+                  options: {
+                    colorize: true,
+                    singleLine: true,
+                  },
+                }
+              : undefined,
+          redact: ['req.headers.authorization', 'req.headers.cookie'],
+        },
+      }),
+    }),
+
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [configuration],
+      validationSchema: envValidationSchema,
+      validationOptions: {
+        abortEarly: false,
+      },
+    }),
+
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
@@ -17,6 +53,7 @@ import { HealthModule } from './health/health.module';
       synchronize: false,
       autoLoadEntities: false,
     }),
+    RedisModule,
     HealthModule,
   ],
   controllers: [],

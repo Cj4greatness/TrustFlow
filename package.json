@@ -1,0 +1,13 @@
+{
+  "name": "trustflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TrustFlow monorepo root - hosts git hooks only. Frontend and backend remain independent apps.",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.1.0"
+  },
+  "scripts": {
+    "prepare": "husky"
+  }
+}
