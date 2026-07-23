@@ -6,7 +6,7 @@ TrustFlow is not a chatbot, not a CRM, and not accounting software. It's the ope
 
 **Who it's for:** SMB owners — starting with businesses in Nigeria and expanding across Africa — who currently run their operations across spreadsheets, WhatsApp, and paper, and need one connected system instead.
 
-> **Status:** Early engineering foundation (Sprint 1). No business features are implemented yet — see [Roadmap](#roadmap).
+> **Status:** Engineering foundation complete (Sprints 1–2). No business features are implemented yet — see [Roadmap](#roadmap). See [`docs/engineering-standards.md`](docs/engineering-standards.md) for coding, Git, and API conventions.
 
 ---
 
@@ -34,7 +34,7 @@ trustflow/
 └── README.md
 
 - **`frontend/`** — The customer-facing web app. Currently a placeholder landing page confirming the environment is wired up correctly.
-- **`backend/`** — The API server. Currently exposes only a health check endpoint; business modules (Auth, CRM, Inventory, Orders, Finance, etc.) will be added sprint by sprint.
+- **`backend/`** — The API server. Currently provides application infrastructure only: validated configuration, PostgreSQL + Redis connections with health checks, structured logging, global error handling and request validation, and live API docs at `/api/docs`. No business modules (Auth, CRM, Inventory, Orders, Finance, etc.) yet — those are added sprint by sprint.
 - **`docker/`** — Empty for now. Will hold shared infrastructure configuration that doesn't belong to a single app (e.g. reverse proxy config) as the project grows.
 - **`docs/`** — Empty for now. Will hold architecture decisions, API references, deployment guides, and sprint reports as they're written.
 
@@ -129,11 +129,13 @@ docker compose up -d
 git add .
 git commit -m "Describe what changed"
 
-# 5. Push
+# 5. Push and open a PR into develop
 git push origin <branch-name>
 ```
 
-Each sprint is scoped deliberately — check with the team before starting work outside the current sprint's stated objective.
+Branching follows `feature/* → develop → main` — see
+[`docs/engineering-standards.md`](docs/engineering-standards.md#git) for full
+branch naming and merge rules. Never commit directly to `main`.
 
 ---
 
@@ -220,9 +222,9 @@ source ~/.bashrc
 ## Roadmap
 
 ### Version 1 (in progress)
-- ✅ Sprint 1 — Engineering foundation (this repo)
-- ⏳ Sprint 2 — Core framework (config, logging, database, Redis modules, global exception handling, validation, Swagger, bootstrap)
-- Authentication & Organizations
+- ✅ Sprint 1 — Engineering foundation (repo, frontend/backend scaffolds, Docker)
+- ✅ Sprint 2 — Core framework (config, logging, database + Redis modules, global exception handling, validation, Swagger, code quality tooling)
+- ⏳ Sprint 3 — Identity & Multi-Tenant Foundation (Auth, Organizations, Users, RBAC)
 - Customers (CRM)
 - Product Catalog & Inventory
 - Orders
