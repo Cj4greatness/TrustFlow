@@ -228,3 +228,13 @@ hard way twice:
   first `up` after creating fresh networks/volumes. If a service can't reach
   another by hostname, a clean `docker compose down && docker compose up -d`
   is a reasonable first troubleshooting step before assuming a config bug.
+
+  - **`docker compose up -d` does not rebuild images automatically.** If backend
+  or frontend code changed since the last build, Docker will silently keep
+  running the old image with no warning or error — the containers start fine,
+  they're just running stale code. Always run `docker compose build` (or
+  `docker compose up -d --build`) after pulling new code, before assuming
+  what's running matches what's in the repo. Caught during the Sprint 2
+  "fresh engineer" verification: `/health` looked correct at a glance, but the
+  logs were missing `RedisModule`, `LoggerModule`, and Swagger entirely,
+  revealing the backend was still running Sprint 1's build.

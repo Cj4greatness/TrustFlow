@@ -73,28 +73,24 @@ cd ..
 
 This is the recommended way to run the full stack — it starts the frontend, backend, PostgreSQL, and Redis together, networked correctly.
 
+**First time, or after pulling new code:** always rebuild before starting, since
+Docker does not automatically detect code changes and will silently run stale
+images otherwise:
+```bash
+docker compose build
+docker compose up -d
+```
+
+**Subsequent starts with no code changes** (e.g. restarting your machine):
 ```bash
 docker compose up -d
 ```
 
-Check everything started correctly:
-```bash
-docker compose ps
-```
-All four services (`trustflow-frontend`, `trustflow-backend`, `trustflow-postgres`, `trustflow-redis`) should show as `Up`, with postgres and redis showing `(healthy)`.
-
-**Verify it's working:**
-- Frontend: open [http://localhost:3000](http://localhost:3000) — should show "TrustFlow Development Environment Ready"
-- Backend: `curl http://localhost:4000/health` — should return `{"status":"ok","service":"TrustFlow API"}`
-
-**Stop everything:**
+If something seems out of date or a container is behaving unexpectedly, force a
+completely clean rebuild:
 ```bash
 docker compose down
-```
-
-**Rebuild after dependency changes:**
-```bash
-docker compose build
+docker compose build --no-cache
 docker compose up -d
 ```
 
@@ -255,4 +251,3 @@ source ~/.bashrc
 - **Engineer** — Implementation
 
 Built one sprint at a time, foundation before features.
-
