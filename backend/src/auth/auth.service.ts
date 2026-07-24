@@ -43,7 +43,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
-    const user = await this.usersRepository.findByEmail(dto.email);
+    const user = await this.usersRepository.findAuthUserByEmail(dto.email);
 
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');

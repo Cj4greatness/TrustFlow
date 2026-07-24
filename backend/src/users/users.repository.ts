@@ -33,6 +33,18 @@ export class UsersRepository {
     return this.repository.findOne({ where: { email } });
   }
 
+  /**
+   * Fetches a user by email for authentication purposes — the
+   * result includes passwordHash and refreshTokenHash, which
+   * UsersService's public methods deliberately never expose. Only
+   * AuthService should call this; the explicit name signals that
+   * privileged intent rather than looking like an interchangeable
+   * generic finder.
+   */
+  findAuthUserByEmail(email: string): Promise<User | null> {
+    return this.repository.findOne({ where: { email } });
+  }
+
   existsByEmail(email: string): Promise<boolean> {
     return this.repository.exists({ where: { email } });
   }
