@@ -18,9 +18,9 @@ export enum UserStatus {
  * to multiple organizations, so organization membership is never
  * modeled directly on this entity.
  *
- * passwordHash is excluded from all serialized responses via
- * class-transformer's @Exclude, enforced globally by the
- * ClassSerializerInterceptor set up in main.ts.
+ * passwordHash and refreshTokenHash are both excluded from all
+ * serialized responses via class-transformer's @Exclude, enforced
+ * globally by the ClassSerializerInterceptor set up in main.ts.
  */
 @Entity('users')
 @Index(['email'], { unique: true })
@@ -56,4 +56,20 @@ export class User extends BaseEntity {
 
   @Column({ type: 'timestamptz', nullable: true, name: 'last_login' })
   lastLogin: Date | null;
+
+  /**
+   * Hash of the current valid refresh token, enabling rotation
+   * (each successful refresh replaces this with a new hash) and
+   * revocation (logout / suspected theft sets this to null,
+   * invalidating the refresh token immediately even though the JWT
+   * itself hasn't expired yet). Never returned via the API.
+   */
+  @Exclude({ toPlainOnly: true })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'refresh_token_hash',
+  })
+  refreshTokenHash: string | null;
 }

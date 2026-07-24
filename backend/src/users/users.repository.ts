@@ -46,6 +46,18 @@ export class UsersRepository {
   }
 
   /**
+   * Persists the hash of the user's current valid refresh token, or
+   * clears it (null) on logout/revocation. Called after every
+   * successful login/register/refresh, and on logout.
+   */
+  async updateRefreshTokenHash(
+    id: string,
+    refreshTokenHash: string | null,
+  ): Promise<void> {
+    await this.repository.update({ id }, { refreshTokenHash });
+  }
+
+  /**
    * Soft-deletes the user (sets deletedAt via TypeORM's soft-delete
    * support) rather than removing the row — audit history and any
    * foreign key references (e.g. OrganizationMember, AuditLog) stay

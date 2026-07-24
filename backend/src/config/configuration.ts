@@ -20,6 +20,12 @@ export interface AppConfig {
     host: string;
     port: number;
   };
+  jwt: {
+    accessSecret: string;
+    accessExpiresIn: string;
+    refreshSecret: string;
+    refreshExpiresIn: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -35,5 +41,11 @@ export default (): AppConfig => ({
   redis: {
     host: process.env.REDIS_HOST!,
     port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+  },
+  jwt: {
+    accessSecret: process.env.JWT_ACCESS_SECRET!,
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
+    refreshSecret: process.env.JWT_REFRESH_SECRET!,
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
 });
