@@ -69,21 +69,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Wait for Postgres
         run: |
@@ -93,10 +98,11 @@ jobs:
           done
 
       - name: Run migrations
-        run: npm run migration:run
+        run: pnpm run migration:run
 
       - name: Run unit tests
-        run: npm run test
+        run: pnpm run test
 
       - name: Run e2e tests (includes invitation lifecycle smoke test)
-        run: npm run test:e2e
+        run: pnpm run test:e2e
+
