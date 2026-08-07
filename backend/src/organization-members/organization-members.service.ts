@@ -10,6 +10,7 @@ import { OrganizationRole } from './entities/organization-member.entity';
 import {
   canPerformMembershipAction,
   MembershipAction,
+  ROLE_RANK,
 } from './membership-rules';
 import { MemberResponseDto } from './dto/member-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
@@ -129,7 +130,7 @@ export class OrganizationMembersService {
     }
 
     const action =
-      this.roleRank(newRole) > this.roleRank(target.role)
+      ROLE_RANK[newRole] > ROLE_RANK[target.role]
         ? MembershipAction.PROMOTE_MEMBER
         : MembershipAction.DEMOTE_MEMBER;
 
@@ -197,15 +198,5 @@ export class OrganizationMembersService {
     }
 
     await this.organizationMembersRepository.removeMember(membership.id);
-  }
-
-  private roleRank(role: OrganizationRole): number {
-    const ranks: Record<OrganizationRole, number> = {
-      [OrganizationRole.STAFF]: 0,
-      [OrganizationRole.MANAGER]: 1,
-      [OrganizationRole.ADMIN]: 2,
-      [OrganizationRole.OWNER]: 3,
-    };
-    return ranks[role];
   }
 }

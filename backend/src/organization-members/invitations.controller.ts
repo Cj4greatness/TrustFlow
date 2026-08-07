@@ -22,6 +22,9 @@ import { Request } from 'express';
 import { InvitationsService } from './invitations.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
+import { PermissionsGuard } from '../authorization/guards/permissions.guard';
+import { Permissions } from '../authorization/decorators/permissions.decorator';
+import { Permission } from '../authorization/permissions.enum';
 
 interface RequestWithUser extends Request {
   user: AuthenticatedUser;
@@ -34,7 +37,8 @@ export class InvitationsController {
 
   @Post(':id/invitations')
   @ApiBearerAuth()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @Permissions(Permission.MEMBER_INVITE)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Invite a user to join an organization' })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
@@ -86,23 +90,31 @@ export class InvitationsController {
   }
 
   @Post('invitations/:token/reject')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reject an invitation' })
   @ApiParam({ name: 'token', description: 'Invitation token' })
   @ApiResponse({ status: 204, description: 'Invitation rejected' })
-  async reject(@Param('token') token: string): Promise<void> {
-    await this.invitationsService.reject(token);
+  async reject(
+    @Param('token') token: string,
+    @Req() req: RequestWithUser,
+  ): Promise<void> {
+    await this.invitationsService.reject(token, req.user.id);
   }
 
-  @Delete('invitations/:invitationId')
+  @Delete(':id/invitations/:invitationId')
   @ApiBearerAuth()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @Permissions(Permission.MEMBER_INVITE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke a pending invitation' })
+  @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiParam({ name: 'invitationId', description: 'Invitation UUID' })
   @ApiResponse({ status: 204, description: 'Invitation revoked' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   async revoke(
+    @Param('id', ParseUUIDPipe) organizationId: string,
     @Param('invitationId', ParseUUIDPipe) invitationId: string,
   ): Promise<void> {
     await this.invitationsService.revoke(invitationId);

@@ -33,7 +33,14 @@ const ACTION_MINIMUM_ROLE: Record<MembershipAction, OrganizationRole> = {
   [MembershipAction.DELETE_ORGANIZATION]: OrganizationRole.OWNER,
 };
 
-const ROLE_RANK: Record<OrganizationRole, number> = {
+/**
+ * Viewer ranks below Staff — read-only, cannot perform any of the
+ * mutating membership actions above (all of which require at least
+ * Admin). Exported so the upcoming Permission Resolver / RBAC module
+ * can reuse the same canonical ordering rather than redefining it.
+ */
+export const ROLE_RANK: Record<OrganizationRole, number> = {
+  [OrganizationRole.VIEWER]: -1,
   [OrganizationRole.STAFF]: 0,
   [OrganizationRole.MANAGER]: 1,
   [OrganizationRole.ADMIN]: 2,

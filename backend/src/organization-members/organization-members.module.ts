@@ -11,6 +11,7 @@ import { OrganizationMembersController } from './organization-members.controller
 import { EmailModule } from '../email/email.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { UsersModule } from '../users/users.module';
+import { AuthorizationModule } from '../authorization/authorization.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { UsersModule } from '../users/users.module';
     EmailModule,
     forwardRef(() => OrganizationsModule),
     UsersModule,
+    forwardRef(() => AuthorizationModule),
   ],
   controllers: [InvitationsController, OrganizationMembersController],
   providers: [

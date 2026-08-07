@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -152,6 +153,16 @@ export class InvitationsService {
   async accept(token: string, acceptingUserId: string): Promise<void> {
     const invitation = await this.validateToken(token);
 
+    const acceptingUser = await this.usersRepository.findById(acceptingUserId);
+    if (!acceptingUser) {
+      throw new NotFoundException('User not found');
+    }
+    if (invitation.invitedEmail !== acceptingUser.email) {
+      throw new ForbiddenException(
+        'This invitation was not issued to your account',
+      );
+    }
+
     const existingMembership =
       await this.organizationMembersRepository.findByOrganizationAndUser(
         invitation.organizationId,
@@ -184,8 +195,19 @@ export class InvitationsService {
     });
   }
 
-  async reject(token: string): Promise<void> {
+  async reject(token: string, rejectingUserId: string): Promise<void> {
     const invitation = await this.validateToken(token);
+
+    const rejectingUser = await this.usersRepository.findById(rejectingUserId);
+    if (!rejectingUser) {
+      throw new NotFoundException('User not found');
+    }
+    if (invitation.invitedEmail !== rejectingUser.email) {
+      throw new ForbiddenException(
+        'This invitation was not issued to your account',
+      );
+    }
+
     // Rejecting doesn't have a dedicated status per the CTO's
     // specified lifecycle (PENDING → ACCEPTED / EXPIRED / REVOKED) —
     // modeled as a revocation initiated by the invitee rather than

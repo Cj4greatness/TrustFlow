@@ -24,6 +24,9 @@ import { OrganizationMembersService } from './organization-members.service';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
+import { PermissionsGuard } from '../authorization/guards/permissions.guard';
+import { Permissions } from '../authorization/decorators/permissions.decorator';
+import { Permission } from '../authorization/permissions.enum';
 
 interface RequestWithUser extends Request {
   user: AuthenticatedUser;
@@ -31,7 +34,7 @@ interface RequestWithUser extends Request {
 
 @ApiTags('organizations')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 @Controller('organizations/:id/members')
 export class OrganizationMembersController {
   constructor(
@@ -39,6 +42,7 @@ export class OrganizationMembersController {
   ) {}
 
   @Get()
+  @Permissions(Permission.MEMBER_VIEW)
   @ApiOperation({ summary: 'List members of an organization' })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   listMembers(
@@ -52,6 +56,7 @@ export class OrganizationMembersController {
   }
 
   @Patch(':memberId')
+  @Permissions(Permission.MEMBER_UPDATE)
   @ApiOperation({ summary: "Update a member's role" })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiParam({ name: 'memberId', description: 'Membership UUID' })
@@ -70,6 +75,7 @@ export class OrganizationMembersController {
   }
 
   @Delete(':memberId')
+  @Permissions(Permission.MEMBER_REMOVE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a member from the organization' })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
@@ -87,6 +93,7 @@ export class OrganizationMembersController {
   }
 
   @Post('transfer-ownership')
+  @Permissions(Permission.OWNERSHIP_TRANSFER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Transfer organization ownership to another member',

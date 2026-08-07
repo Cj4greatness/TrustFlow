@@ -10,6 +10,7 @@ import { OrganizationMembersModule } from './organization-members/organization-m
 import { AuditModule } from './audit/audit.module';
 import { SecurityModule } from './security/security.module';
 import { AuthModule } from './auth/auth.module';
+import { AuthorizationModule } from './authorization/authorization.module';
 import configuration from './config/configuration';
 import { envValidationSchema } from './config/env.validation';
 
@@ -67,6 +68,7 @@ import { envValidationSchema } from './config/env.validation';
     AuditModule,
     SecurityModule,
     AuthModule,
+    AuthorizationModule,
   ],
   controllers: [],
   providers: [],

@@ -8,6 +8,7 @@ export enum OrganizationRole {
   ADMIN = 'admin',
   MANAGER = 'manager',
   STAFF = 'staff',
+  VIEWER = 'viewer',
 }
 
 /**
