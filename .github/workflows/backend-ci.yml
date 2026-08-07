@@ -1,0 +1,102 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: trustflow
+          POSTGRES_PASSWORD: trustflow
+          POSTGRES_DB: trustflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trustflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      PORT: 4000
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: trustflow
+      DB_PASSWORD: trustflow
+      DB_NAME: trustflow
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      # CI-only secrets — replace by adding real values under
+      # Settings > Secrets and variables > Actions in the repo, or
+      # this falls back to these placeholder values (fine for CI
+      # since no real users/data are ever involved, but do NOT reuse
+      # these values anywhere real).
+      JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'ci-only-access-secret-not-for-real-use-32chars' }}
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-only-refresh-secret-not-for-real-use-32char' }}
+      JWT_REFRESH_EXPIRES_IN: 7d
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U trustflow; do
+            echo "Waiting for Postgres..."
+            sleep 2
+          done
+
+      - name: Run migrations
+        run: npm run migration:run
+
+      - name: Run unit tests
+        run: npm run test
+
+      - name: Run e2e tests (includes invitation lifecycle smoke test)
+        run: npm run test:e2e
