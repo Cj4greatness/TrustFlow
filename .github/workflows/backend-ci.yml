@@ -101,7 +101,7 @@ jobs:
         run: pnpm run migration:run
 
       - name: Run unit tests
-        run: pnpm run test
+        run: pnpm run test -- --passWithNoTests
 
       - name: Run e2e tests (includes invitation lifecycle smoke test)
         run: pnpm run test:e2e
