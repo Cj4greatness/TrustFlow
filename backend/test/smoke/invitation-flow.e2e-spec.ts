@@ -171,7 +171,12 @@ describe('Invitation Lifecycle (e2e)', () => {
     expect(member).toBeDefined();
     expect(member?.role).toBe('viewer');
   });
-
+  it('allows a viewer-role member to list org members (regression check for a permission bug where listMembers() incorrectly required admin rank)', async () => {
+    await request(server)
+      .get(`/organizations/${orgId}/members`)
+      .set('Authorization', `Bearer ${invitedToken}`)
+      .expect(200);
+  });
   it('rejects a duplicate accept of the same invitation', async () => {
     const res = await request(server)
       .post(`/organizations/invitations/${invitationToken}/accept`)

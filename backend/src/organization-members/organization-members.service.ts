@@ -46,16 +46,7 @@ export class OrganizationMembersService {
     return actorMembership;
   }
 
-  async listMembers(
-    organizationId: string,
-    actingUserId: string,
-  ): Promise<MemberResponseDto[]> {
-    await this.requirePermission(
-      organizationId,
-      actingUserId,
-      MembershipAction.INVITE_MEMBER,
-    );
-
+  async listMembers(organizationId: string): Promise<MemberResponseDto[]> {
     const members =
       await this.organizationMembersRepository.findByOrganization(
         organizationId,

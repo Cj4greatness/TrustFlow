@@ -200,7 +200,11 @@ WRONGREJECT_INVITE_RESPONSE=$(curl -s -X POST "$BASE_URL/organizations/$ORG_ID/i
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$WRONGREJECT_INVITE_EMAIL\",\"role\":\"viewer\"}")
 WRONGREJECT_TOKEN=$(echo "$WRONGREJECT_INVITE_RESPONSE" | json_get "['token']")
-
+echo "=== 21. Viewer can list org members (regression check for listMembers() permission bug) ==="
+VIEWER_LIST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+  "$BASE_URL/organizations/$ORG_ID/members" \
+  -H "Authorization: Bearer $VIEWER_TOKEN")
+[ "$VIEWER_LIST_STATUS" = "200" ] && pass "Viewer can list org members (200)" || fail "Expected 200, got $VIEWER_LIST_STATUS — listMembers() permission regression?"
 if [ -n "$WRONGREJECT_TOKEN" ] && [ -n "${UNRELATED_TOKEN:-}" ]; then
   WRONGREJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     "$BASE_URL/organizations/invitations/$WRONGREJECT_TOKEN/reject" \

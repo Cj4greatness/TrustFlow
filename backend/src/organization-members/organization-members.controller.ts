@@ -45,14 +45,8 @@ export class OrganizationMembersController {
   @Permissions(Permission.MEMBER_VIEW)
   @ApiOperation({ summary: 'List members of an organization' })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
-  listMembers(
-    @Param('id', ParseUUIDPipe) organizationId: string,
-    @Req() req: RequestWithUser,
-  ) {
-    return this.organizationMembersService.listMembers(
-      organizationId,
-      req.user.id,
-    );
+  listMembers(@Param('id', ParseUUIDPipe) organizationId: string) {
+    return this.organizationMembersService.listMembers(organizationId);
   }
 
   @Patch(':memberId')
