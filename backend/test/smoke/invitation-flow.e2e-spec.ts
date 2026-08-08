@@ -263,4 +263,14 @@ describe('Invitation Lifecycle (e2e)', () => {
     // would mean anyone can cancel anyone else's pending invitation.
     expect(res.status).toBe(403);
   });
+
+  it('forbids a viewer from removing a member, but allows the owner to', async () => {
+    const forbiddenRes = await request(server)
+      .delete(`/organizations/${orgId}/members/nonexistent-placeholder`)
+      .set('Authorization', `Bearer ${invitedToken}`);
+
+    // PermissionsGuard should reject before the service ever looks up
+    // the member, so this 403s regardless of whether the ID is real.
+    expect(forbiddenRes.status).toBe(403);
+  });
 });

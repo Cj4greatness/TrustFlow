@@ -77,12 +77,10 @@ export class OrganizationMembersController {
   async removeMember(
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
-    @Req() req: RequestWithUser,
   ): Promise<void> {
     await this.organizationMembersService.removeMember(
       organizationId,
       memberId,
-      req.user.id,
     );
   }
 

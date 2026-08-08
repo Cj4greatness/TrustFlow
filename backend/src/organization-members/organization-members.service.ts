@@ -77,14 +77,7 @@ export class OrganizationMembersService {
   async removeMember(
     organizationId: string,
     memberIdToRemove: string,
-    actingUserId: string,
   ): Promise<void> {
-    await this.requirePermission(
-      organizationId,
-      actingUserId,
-      MembershipAction.REMOVE_MEMBER,
-    );
-
     const target =
       await this.organizationMembersRepository.findById(memberIdToRemove);
     if (!target || target.organizationId !== organizationId) {

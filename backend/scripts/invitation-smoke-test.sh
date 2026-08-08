@@ -4,25 +4,10 @@ set -uo pipefail
 # ==============================================================================
 # TrustFlow Invitation Lifecycle Smoke Test
 # Covers: auth -> org creation -> invite -> accept -> membership -> RBAC edges
-#
-# Confirmed against:
-#   src/organizations/organizations.controller.ts
-#   src/organization-members/invitations.controller.ts
-#   src/organization-members/organization-members.controller.ts
-#   src/organization-members/dto/create-invitation.dto.ts
-#   src/organization-members/entities/invitation.entity.ts
-#   src/organization-members/entities/organization-member.entity.ts
-#   src/organizations/dto/create-organization.dto.ts
-#
-# NOTE: listMembers() currently gates on MembershipAction.INVITE_MEMBER,
-# so OWNER_TOKEN is used for the members-list check below (a plain
-# viewer likely can't call GET /organizations/:id/members — confirm
-# with your CTO whether that's intended).
 # ==============================================================================
 
 BASE_URL="${BASE_URL:-http://localhost:4000}"
 
-# Test users — adjust to your seeded test accounts
 OWNER_EMAIL="owner.test@example.com"
 OWNER_PASSWORD="SecurePass123"
 
@@ -83,7 +68,6 @@ ACCEPT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
 [ "$ACCEPT_STATUS" = "204" ] && pass "Accept returned 204" || fail "Expected 204, got $ACCEPT_STATUS"
 
 echo "=== 8/9/10. GET members -> viewer present with role=viewer ==="
-# Uses OWNER_TOKEN since listMembers() requires INVITE_MEMBER permission
 MEMBERS_RESPONSE=$(curl -s -X GET "$BASE_URL/organizations/$ORG_ID/members" \
   -H "Authorization: Bearer $OWNER_TOKEN")
 VIEWER_ROLE=$(echo "$MEMBERS_RESPONSE" | python3 -c "
@@ -107,9 +91,6 @@ case "$DUP_STATUS" in
 esac
 
 echo "=== 13/14/15. Unrelated user attempts accept on a FRESH invite -> expect 403 or equivalent ==="
-# Create a second, separate invitation (different email) so this checks
-# "wrong user, still-pending invite" cleanly, rather than reusing the
-# already-accepted token from above (which would just retest 11/12).
 UNRELATED_TOKEN=$(login "$UNRELATED_EMAIL" "$UNRELATED_PASSWORD")
 if [ -n "$UNRELATED_TOKEN" ]; then
   SECOND_INVITE_EMAIL="viewer2.test@example.com"
@@ -123,12 +104,6 @@ if [ -n "$UNRELATED_TOKEN" ]; then
     WRONG_USER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
       "$BASE_URL/organizations/invitations/$SECOND_TOKEN/accept" \
       -H "Authorization: Bearer $UNRELATED_TOKEN")
-    # NOTE: controller only has @UseGuards(AuthGuard('jwt')) on accept() —
-    # no PermissionsGuard or explicit email-match check visible in the
-    # controller. The service layer may enforce req.user.email === invitedEmail
-    # and throw ForbiddenException (403), or it may not check at all and
-    # incorrectly accept (200/204). Flag to CTO if you get 204 here — that's
-    # a real vulnerability (anyone can accept anyone else's invitation).
     case "$WRONG_USER_STATUS" in
       403) pass "Unrelated user correctly forbidden (403)" ;;
       204) fail "SECURITY ISSUE: unrelated user was able to accept another user's invitation (204)" ;;
@@ -200,11 +175,7 @@ WRONGREJECT_INVITE_RESPONSE=$(curl -s -X POST "$BASE_URL/organizations/$ORG_ID/i
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$WRONGREJECT_INVITE_EMAIL\",\"role\":\"viewer\"}")
 WRONGREJECT_TOKEN=$(echo "$WRONGREJECT_INVITE_RESPONSE" | json_get "['token']")
-echo "=== 21. Viewer can list org members (regression check for listMembers() permission bug) ==="
-VIEWER_LIST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
-  "$BASE_URL/organizations/$ORG_ID/members" \
-  -H "Authorization: Bearer $VIEWER_TOKEN")
-[ "$VIEWER_LIST_STATUS" = "200" ] && pass "Viewer can list org members (200)" || fail "Expected 200, got $VIEWER_LIST_STATUS — listMembers() permission regression?"
+
 if [ -n "$WRONGREJECT_TOKEN" ] && [ -n "${UNRELATED_TOKEN:-}" ]; then
   WRONGREJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     "$BASE_URL/organizations/invitations/$WRONGREJECT_TOKEN/reject" \
@@ -217,6 +188,34 @@ if [ -n "$WRONGREJECT_TOKEN" ] && [ -n "${UNRELATED_TOKEN:-}" ]; then
 else
   fail "Could not set up wrong-user reject test (invite token: '$WRONGREJECT_TOKEN', unrelated login: '${UNRELATED_TOKEN:-}')"
 fi
+
+echo "=== 21. Viewer can list org members (regression check for listMembers() permission bug) ==="
+VIEWER_LIST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+  "$BASE_URL/organizations/$ORG_ID/members" \
+  -H "Authorization: Bearer $VIEWER_TOKEN")
+[ "$VIEWER_LIST_STATUS" = "200" ] && pass "Viewer can list org members (200)" || fail "Expected 200, got $VIEWER_LIST_STATUS — listMembers() permission regression?"
+
+echo "=== 22. Viewer cannot remove a member (should be 403); owner can ==="
+REMOVE_TARGET_MEMBER_ID=$(curl -s -X GET "$BASE_URL/organizations/$ORG_ID/members" \
+  -H "Authorization: Bearer $OWNER_TOKEN" \
+  | python3 -c "
+import sys, json
+members = json.load(sys.stdin)
+for m in members:
+    if m['user']['email'] == '$VIEWER_EMAIL':
+        print(m['id'])
+        break
+")
+
+VIEWER_REMOVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+  "$BASE_URL/organizations/$ORG_ID/members/$REMOVE_TARGET_MEMBER_ID" \
+  -H "Authorization: Bearer $VIEWER_TOKEN")
+[ "$VIEWER_REMOVE_STATUS" = "403" ] && pass "Viewer correctly forbidden from removing a member (403)" || fail "Expected 403, got $VIEWER_REMOVE_STATUS"
+
+OWNER_REMOVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+  "$BASE_URL/organizations/$ORG_ID/members/$REMOVE_TARGET_MEMBER_ID" \
+  -H "Authorization: Bearer $OWNER_TOKEN")
+[ "$OWNER_REMOVE_STATUS" = "204" ] && pass "Owner successfully removed member (204)" || fail "Expected 204, got $OWNER_REMOVE_STATUS"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
