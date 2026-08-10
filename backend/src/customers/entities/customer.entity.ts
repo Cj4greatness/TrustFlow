@@ -1,6 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
+import { User } from '../../users/entities/user.entity';
 
 export enum CustomerType {
   INDIVIDUAL = 'individual',
@@ -95,17 +96,17 @@ export class Customer extends BaseEntity {
   source: string | null;
 
   /**
-   * The user who created this customer record. Modeled as a bare
-   * uuid column with no FK relation or DB constraint — matching
-   * OrganizationMember.invitedBy, the closest existing precedent for
-   * an "acting user" reference on a business/tenant-scoped entity.
-   * (Invitation.invitedBy instead carries a full @ManyToOne with
-   * onDelete: CASCADE — see the architectural discrepancy note in
-   * the implementation report; that pattern was not reused here
-   * since CASCADE would delete customer records if the creating
-   * user's account were ever removed, which is not acceptable for
-   * business data.)
+   * The user who created this customer record. Follows the
+   * established Invitation.invitedBy/inviter convention: a bare
+   * uuid column for the FK value plus a separately-named @ManyToOne
+   * relation (here `creator`) pointing at the same column via
+   * @JoinColumn, with onDelete: 'CASCADE' — mirrored exactly per
+   * CTO decision, closing the discrepancy raised after Step 1.
    */
   @Column({ type: 'uuid', name: 'created_by' })
   createdBy: string;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'created_by' })
+  creator: User;
 }
