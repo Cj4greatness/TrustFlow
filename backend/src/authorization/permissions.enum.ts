@@ -26,4 +26,12 @@ export enum Permission {
   INVOICE_CREATE = 'invoice:create',
   INVOICE_APPROVE = 'invoice:approve',
   INVENTORY_UPDATE = 'inventory:update',
+
+  // Customer (Sprint 4)
+  CUSTOMER_CREATE = 'customer:create',
+  CUSTOMER_READ = 'customer:read',
+  CUSTOMER_UPDATE = 'customer:update',
+  CUSTOMER_DELETE = 'customer:delete',
+  CUSTOMER_NOTE_CREATE = 'customer_note:create',
+  CUSTOMER_NOTE_READ = 'customer_note:read',
 }
