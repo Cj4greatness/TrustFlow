@@ -7,6 +7,7 @@ import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationMembersModule } from './organization-members/organization-members.module';
+import { CustomersModule } from './customers/customers.module';
 import { AuditModule } from './audit/audit.module';
 import { SecurityModule } from './security/security.module';
 import { AuthModule } from './auth/auth.module';
@@ -65,6 +66,7 @@ import { envValidationSchema } from './config/env.validation';
     UsersModule,
     OrganizationsModule,
     OrganizationMembersModule,
+    CustomersModule,
     AuditModule,
     SecurityModule,
     AuthModule,
