@@ -122,7 +122,7 @@ describe('Invitation Lifecycle (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 
   it('creates an organization', async () => {
     const res = await request(server)
