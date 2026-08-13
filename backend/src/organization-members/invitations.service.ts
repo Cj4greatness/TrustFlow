@@ -227,9 +227,15 @@ export class InvitationsService {
    * with different callers and, eventually, different audit log
    * entries.
    */
-  async revoke(invitationId: string): Promise<void> {
+  async revoke(organizationId: string, invitationId: string): Promise<void> {
     const invitation = await this.invitationsRepository.findById(invitationId);
-    if (!invitation) {
+    // organizationId is checked here, not just via PermissionsGuard —
+    // the guard only confirms the actor has MEMBER_INVITE permission
+    // within the org identified by the route, not that this specific
+    // invitation belongs to that org. Same class of gap the Sprint 3
+    // RBAC audit found in listMembers(), and the pattern the Customer
+    // module's getOwnedXOrThrow() helpers were built to prevent.
+    if (!invitation || invitation.organizationId !== organizationId) {
       throw new NotFoundException('Invitation not found');
     }
     if (invitation.status !== InvitationStatus.PENDING) {

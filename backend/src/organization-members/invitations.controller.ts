@@ -117,6 +117,6 @@ export class InvitationsController {
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Param('invitationId', ParseUUIDPipe) invitationId: string,
   ): Promise<void> {
-    await this.invitationsService.revoke(invitationId);
+    await this.invitationsService.revoke(organizationId, invitationId);
   }
 }
