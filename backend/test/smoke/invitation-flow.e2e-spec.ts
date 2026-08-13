@@ -118,11 +118,11 @@ describe('Invitation Lifecycle (e2e)', () => {
       'RejectTarget',
     );
     await registerAndLogin(wrongRejectEmail, 'WrongReject');
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();
-  }, 30000);
+  });
 
   it('creates an organization', async () => {
     const res = await request(server)
@@ -224,6 +224,49 @@ describe('Invitation Lifecycle (e2e)', () => {
 
     expect([400, 409, 410]).toContain(res.status);
   });
+  it(
+    "forbids revoking another organization's invitation, even with a " +
+      'valid Owner token and a valid MEMBER_INVITE permission — regression ' +
+      'test for the InvitationsService.revoke() ownership gap found in the ' +
+      'Sprint 3 audit, where organizationId from the route was never ' +
+      "checked against the invitation's actual organizationId",
+    async () => {
+      const otherOrgOwnerEmail = `otherorgowner.${runId}@example.com`;
+      const otherOrgOwnerToken = await registerAndLogin(
+        otherOrgOwnerEmail,
+        'OtherOrgOwner',
+      );
+
+      const otherOrgRes = await request(server)
+        .post('/organizations')
+        .set('Authorization', `Bearer ${otherOrgOwnerToken}`)
+        .send({
+          name: `Smoke Test Other Org ${runId}`,
+          country: 'Nigeria',
+          currency: 'NGN',
+        })
+        .expect(201);
+      const otherOrg = otherOrgRes.body as OrganizationResponseBody;
+
+      const crossOrgInviteEmail = `crossorgtarget.${runId}@example.com`;
+      const inviteRes = await request(server)
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ email: crossOrgInviteEmail, role: 'viewer' })
+        .expect(201);
+      const invite = inviteRes.body as InvitationResponseBody;
+
+      // otherOrgOwnerToken has MEMBER_INVITE within otherOrg.id (they're
+      // its Owner) — but the invitation belongs to orgId, not otherOrg.id.
+      // A 204 here would mean any org owner can revoke any other org's
+      // pending invitations, as long as they know the invitation's UUID.
+      const res = await request(server)
+        .delete(`/organizations/${otherOrg.id}/invitations/${invite.id}`)
+        .set('Authorization', `Bearer ${otherOrgOwnerToken}`);
+
+      expect(res.status).toBe(404);
+    },
+  );
 
   it('lets the invited user reject their own invitation, after which it can no longer be accepted', async () => {
     const inviteRes = await request(server)
