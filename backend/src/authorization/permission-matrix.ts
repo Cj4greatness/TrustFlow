@@ -1,5 +1,5 @@
-import { OrganizationRole } from '../organization-members/entities/organization-member.entity';
 import { Permission } from './permissions.enum';
+import { OrganizationRole } from '../organization-members/entities/organization-member.entity';
 
 /**
  * The authoritative mapping of what each role can do. This is the
@@ -28,6 +28,12 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.CUSTOMER_DELETE,
     Permission.CUSTOMER_NOTE_CREATE,
     Permission.CUSTOMER_NOTE_READ,
+    Permission.PRODUCT_CREATE,
+    Permission.PRODUCT_READ,
+    Permission.PRODUCT_UPDATE,
+    Permission.PRODUCT_DELETE,
+    Permission.INVENTORY_READ,
+    Permission.INVENTORY_ADJUST,
   ],
   [OrganizationRole.ADMIN]: [
     Permission.ORGANIZATION_UPDATE,
@@ -48,6 +54,12 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.CUSTOMER_DELETE,
     Permission.CUSTOMER_NOTE_CREATE,
     Permission.CUSTOMER_NOTE_READ,
+    Permission.PRODUCT_CREATE,
+    Permission.PRODUCT_READ,
+    Permission.PRODUCT_UPDATE,
+    Permission.PRODUCT_DELETE,
+    Permission.INVENTORY_READ,
+    Permission.INVENTORY_ADJUST,
   ],
   [OrganizationRole.MANAGER]: [
     Permission.ORGANIZATION_VIEW,
@@ -71,6 +83,16 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // permission matrix, only Owner/Admin can delete customers.
     Permission.CUSTOMER_NOTE_CREATE,
     Permission.CUSTOMER_NOTE_READ,
+    Permission.PRODUCT_CREATE,
+    Permission.PRODUCT_READ,
+    Permission.PRODUCT_UPDATE,
+    // Deliberately no PRODUCT_DELETE — same reasoning as
+    // CUSTOMER_DELETE: only Owner/Admin can delete. Unlike the
+    // Customer matrix, PRODUCT_UPDATE IS included here deliberately
+    // — the CUSTOMER_UPDATE gap for Manager was flagged as likely
+    // unintentional, so it isn't repeated here without a reason.
+    Permission.INVENTORY_READ,
+    Permission.INVENTORY_ADJUST,
   ],
   [OrganizationRole.STAFF]: [
     Permission.ORGANIZATION_VIEW,
@@ -84,6 +106,20 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // Deliberately no CUSTOMER_DELETE — same reasoning as Manager.
     Permission.CUSTOMER_NOTE_CREATE,
     Permission.CUSTOMER_NOTE_READ,
+    Permission.PRODUCT_READ,
+    // No PRODUCT_CREATE/UPDATE/DELETE for Staff — product
+    // definition/pricing is treated as a Manager+ responsibility.
+    Permission.INVENTORY_READ,
+    // FLAGGED FOR CTO REVIEW: INVENTORY_ADJUST for Staff.
+    // The directive does not explicitly establish whether Staff may
+    // adjust inventory. Do not infer this from PRODUCT_UPDATE being
+    // withheld above — they're independent decisions. Inventory
+    // adjustments change stock state and create audit records, so
+    // this needs an explicit business-policy decision, not an
+    // implementation default. Withheld (not granted) until decided,
+    // matching the safer-default precedent set by the unresolved
+    // CUSTOMER_UPDATE gap for Manager/Staff.
+    // INVENTORY_ADJUST intentionally NOT included here.
   ],
   [OrganizationRole.VIEWER]: [
     Permission.ORGANIZATION_VIEW,
@@ -92,5 +128,7 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // mutating permissions of any kind.
     Permission.CUSTOMER_READ,
     Permission.CUSTOMER_NOTE_READ,
+    Permission.PRODUCT_READ,
+    Permission.INVENTORY_READ,
   ],
 };

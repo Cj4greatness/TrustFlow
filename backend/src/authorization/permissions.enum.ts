@@ -34,4 +34,12 @@ export enum Permission {
   CUSTOMER_DELETE = 'customer:delete',
   CUSTOMER_NOTE_CREATE = 'customer_note:create',
   CUSTOMER_NOTE_READ = 'customer_note:read',
+
+  // Product & Inventory (Sprint 4, CTO Directive v1)
+  PRODUCT_CREATE = 'product:create',
+  PRODUCT_READ = 'product:read',
+  PRODUCT_UPDATE = 'product:update',
+  PRODUCT_DELETE = 'product:delete',
+  INVENTORY_READ = 'inventory:read',
+  INVENTORY_ADJUST = 'inventory:adjust',
 }

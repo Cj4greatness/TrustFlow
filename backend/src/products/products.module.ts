@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { Inventory } from './entities/inventory.entity';
@@ -8,17 +8,18 @@ import { InventoryRepository } from './inventory.repository';
 import { InventoryMovementRepository } from './inventory-movement.repository';
 import { ProductsService } from './products.service';
 import { InventoryService } from './inventory.service';
+import { ProductsController } from './products.controller';
+import { InventoryController } from './inventory.controller';
+import { AuthorizationModule } from '../authorization/authorization.module';
+import { OrganizationMembersModule } from '../organization-members/organization-members.module';
 
-/**
- * No controllers yet — this module exists to wire DI (repositories,
- * services, TypeOrmModule entity registration) so the service layer
- * can be tested directly against a real database before controllers
- * are built (CTO Directive v1 implementation sequence, step 9:
- * tenant-isolation tests precede step 10: controllers).
- */
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, Inventory, InventoryMovement])],
-  controllers: [],
+  imports: [
+    TypeOrmModule.forFeature([Product, Inventory, InventoryMovement]),
+    forwardRef(() => AuthorizationModule),
+    forwardRef(() => OrganizationMembersModule),
+  ],
+  controllers: [ProductsController, InventoryController],
   providers: [
     ProductsRepository,
     InventoryRepository,
