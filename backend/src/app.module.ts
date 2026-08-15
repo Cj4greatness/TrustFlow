@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationMembersModule } from './organization-members/organization-members.module';
 import { CustomersModule } from './customers/customers.module';
+import { ProductsModule } from './products/products.module';
 import { AuditModule } from './audit/audit.module';
 import { SecurityModule } from './security/security.module';
 import { AuthModule } from './auth/auth.module';
@@ -67,6 +68,7 @@ import { envValidationSchema } from './config/env.validation';
     OrganizationsModule,
     OrganizationMembersModule,
     CustomersModule,
+    ProductsModule,
     AuditModule,
     SecurityModule,
     AuthModule,
