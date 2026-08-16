@@ -42,4 +42,11 @@ export enum Permission {
   PRODUCT_DELETE = 'product:delete',
   INVENTORY_READ = 'inventory:read',
   INVENTORY_ADJUST = 'inventory:adjust',
+
+  // Suppliers (Sprint 4, Suppliers Directive v1)
+  SUPPLIER_CREATE = 'supplier:create',
+  SUPPLIER_READ = 'supplier:read',
+  SUPPLIER_UPDATE = 'supplier:update',
+  SUPPLIER_DELETE = 'supplier:delete',
+  SUPPLIER_PRODUCT_MANAGE = 'supplier_product:manage',
 }
