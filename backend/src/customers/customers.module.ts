@@ -30,6 +30,6 @@ import { OrganizationMembersModule } from '../organization-members/organization-
     CustomerNotesRepository,
     CustomersService,
   ],
-  exports: [TypeOrmModule, CustomersRepository],
+  exports: [TypeOrmModule, CustomersRepository, CustomersService],
 })
 export class CustomersModule {}
