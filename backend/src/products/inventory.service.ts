@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ProductsService } from './products.service';
 import { InventoryRepository } from './inventory.repository';
 import {
@@ -24,12 +24,6 @@ export class InventoryService {
     private readonly inventoryMovementRepository: InventoryMovementRepository,
   ) {}
 
-  /**
-   * Confirms the product belongs to the organization, then loads its
-   * Inventory row. Mirrors CustomersService.getOwnedAddressOrThrow —
-   * walks the ownership chain from the parent (Product) down before
-   * trusting the child (Inventory).
-   */
   private async getOwnedInventoryOrThrow(
     organizationId: string,
     productId: string,
@@ -41,10 +35,6 @@ export class InventoryService {
 
     const inventory = await this.inventoryRepository.findByProductId(productId);
     if (!inventory || inventory.organizationId !== organizationId) {
-      // Should be unreachable in practice — every product gets an
-      // Inventory row atomically at creation (see
-      // ProductsService.createProduct) — but kept as a real check
-      // rather than a non-null assertion.
       throw new NotFoundException('Inventory not found for this product');
     }
     return inventory;
@@ -58,62 +48,101 @@ export class InventoryService {
   }
 
   /**
-   * Applies an ADD/REMOVE adjustment atomically: locks the Inventory
-   * row (SELECT ... FOR UPDATE) inside the transaction so concurrent
-   * adjustments can't both read the same starting quantity and
-   * produce an incorrect final balance, computes the new quantity,
-   * rejects it if it would go negative, then updates Inventory and
-   * inserts the InventoryMovement audit record together. Either both
-   * succeed or neither does.
+   * The actual locked-adjustment logic, factored out so it can run
+   * against either a fresh transaction (adjustInventory's default
+   * behavior) or a transaction manager passed in by a caller that
+   * needs this adjustment to be part of a larger atomic operation
+   * (e.g. OrdersService.confirmOrder deducting inventory for
+   * multiple order items — all deduct, or none do). This is the
+   * exact concurrency-safe pattern proven by the earlier
+   * 10-concurrent-adjustments test: SELECT ... FOR UPDATE inside
+   * the transaction, compute, reject if negative, save + record
+   * movement together.
+   */
+  private async applyAdjustment(
+    manager: EntityManager,
+    organizationId: string,
+    inventoryId: string,
+    dto: AdjustInventoryDto,
+    createdByUserId: string,
+  ): Promise<Inventory> {
+    const inventoryRepo = this.inventoryRepository.withTransaction(manager);
+    const movementRepo =
+      this.inventoryMovementRepository.withTransaction(manager);
+
+    const lockedInventory = await inventoryRepo.findByIdForUpdate(inventoryId);
+    if (!lockedInventory) {
+      throw new NotFoundException('Inventory not found');
+    }
+
+    const delta =
+      dto.type === InventoryMovementType.ADD ? dto.quantity : -dto.quantity;
+    const newQuantity = lockedInventory.quantity + delta;
+
+    if (newQuantity < 0) {
+      throw new BadRequestException(
+        `Adjustment would result in negative inventory (current: ${lockedInventory.quantity}, requested: ${dto.type} ${dto.quantity})`,
+      );
+    }
+
+    lockedInventory.quantity = newQuantity;
+    const savedInventory = await inventoryRepo.save(lockedInventory);
+
+    const movement = movementRepo.create({
+      organizationId,
+      inventoryId: lockedInventory.id,
+      type: dto.type,
+      quantity: dto.quantity,
+      reason: dto.reason,
+      createdBy: createdByUserId,
+    });
+    await movementRepo.save(movement);
+
+    return savedInventory;
+  }
+
+  /**
+   * Applies an ADD/REMOVE adjustment. If no `manager` is provided
+   * (the normal case — a direct client-facing inventory adjustment),
+   * opens and manages its own transaction, exactly as before this
+   * refactor. If a `manager` IS provided, joins that caller's
+   * existing transaction instead of opening a new one — this is
+   * what lets OrdersService.confirmOrder() deduct inventory for
+   * several order items as one atomic unit: either all products
+   * have sufficient stock and all deduct together, or the entire
+   * order confirmation rolls back, per Directive v1 §7.
    */
   async adjustInventory(
     organizationId: string,
     productId: string,
     dto: AdjustInventoryDto,
     createdByUserId: string,
+    manager?: EntityManager,
   ): Promise<Inventory> {
     const inventory = await this.getOwnedInventoryOrThrow(
       organizationId,
       productId,
     );
 
-    return this.dataSource.transaction(async (manager) => {
-      const inventoryRepo = this.inventoryRepository.withTransaction(manager);
-      const movementRepo =
-        this.inventoryMovementRepository.withTransaction(manager);
-
-      const lockedInventory = await inventoryRepo.findByIdForUpdate(
-        inventory.id,
-      );
-      if (!lockedInventory) {
-        throw new NotFoundException('Inventory not found');
-      }
-
-      const delta =
-        dto.type === InventoryMovementType.ADD ? dto.quantity : -dto.quantity;
-      const newQuantity = lockedInventory.quantity + delta;
-
-      if (newQuantity < 0) {
-        throw new BadRequestException(
-          `Adjustment would result in negative inventory (current: ${lockedInventory.quantity}, requested: ${dto.type} ${dto.quantity})`,
-        );
-      }
-
-      lockedInventory.quantity = newQuantity;
-      const savedInventory = await inventoryRepo.save(lockedInventory);
-
-      const movement = movementRepo.create({
+    if (manager) {
+      return this.applyAdjustment(
+        manager,
         organizationId,
-        inventoryId: lockedInventory.id,
-        type: dto.type,
-        quantity: dto.quantity,
-        reason: dto.reason,
-        createdBy: createdByUserId,
-      });
-      await movementRepo.save(movement);
+        inventory.id,
+        dto,
+        createdByUserId,
+      );
+    }
 
-      return savedInventory;
-    });
+    return this.dataSource.transaction((txManager) =>
+      this.applyAdjustment(
+        txManager,
+        organizationId,
+        inventory.id,
+        dto,
+        createdByUserId,
+      ),
+    );
   }
 
   async listMovements(

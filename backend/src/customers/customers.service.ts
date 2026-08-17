@@ -47,7 +47,7 @@ export class CustomersService {
   // OrganizationMembersService (removeMember, updateMemberRole).
   // -----------------------------------------------------------------
 
-  private async getOwnedCustomerOrThrow(
+  async getOwnedCustomerOrThrow(
     organizationId: string,
     customerId: string,
   ): Promise<Customer> {
