@@ -49,4 +49,13 @@ export enum Permission {
   SUPPLIER_UPDATE = 'supplier:update',
   SUPPLIER_DELETE = 'supplier:delete',
   SUPPLIER_PRODUCT_MANAGE = 'supplier_product:manage',
+
+  // Orders (Sprint 4, Orders Directive v1)
+  ORDER_CREATE = 'order:create',
+  ORDER_READ = 'order:read',
+  ORDER_UPDATE = 'order:update',
+  ORDER_CONFIRM = 'order:confirm',
+  ORDER_CANCEL = 'order:cancel',
+  ORDER_PROCESS = 'order:process',
+  ORDER_COMPLETE = 'order:complete',
 }

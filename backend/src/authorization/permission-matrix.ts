@@ -34,6 +34,13 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.PRODUCT_DELETE,
     Permission.INVENTORY_READ,
     Permission.INVENTORY_ADJUST,
+    Permission.ORDER_CREATE,
+    Permission.ORDER_READ,
+    Permission.ORDER_UPDATE,
+    Permission.ORDER_CONFIRM,
+    Permission.ORDER_CANCEL,
+    Permission.ORDER_PROCESS,
+    Permission.ORDER_COMPLETE,
   ],
   [OrganizationRole.ADMIN]: [
     Permission.ORGANIZATION_UPDATE,
@@ -60,6 +67,13 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.PRODUCT_DELETE,
     Permission.INVENTORY_READ,
     Permission.INVENTORY_ADJUST,
+    Permission.ORDER_CREATE,
+    Permission.ORDER_READ,
+    Permission.ORDER_UPDATE,
+    Permission.ORDER_CONFIRM,
+    Permission.ORDER_CANCEL,
+    Permission.ORDER_PROCESS,
+    Permission.ORDER_COMPLETE,
   ],
   [OrganizationRole.MANAGER]: [
     Permission.ORGANIZATION_VIEW,
@@ -93,6 +107,14 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // unintentional, so it isn't repeated here without a reason.
     Permission.INVENTORY_READ,
     Permission.INVENTORY_ADJUST,
+    Permission.ORDER_CREATE,
+    Permission.ORDER_READ,
+    Permission.ORDER_UPDATE,
+    Permission.ORDER_CONFIRM,
+    // Deliberately no ORDER_CANCEL — approved Orders RBAC matrix:
+    // Manager gets all order permissions except cancellation.
+    Permission.ORDER_PROCESS,
+    Permission.ORDER_COMPLETE,
   ],
   [OrganizationRole.STAFF]: [
     Permission.ORGANIZATION_VIEW,
@@ -120,6 +142,11 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // matching the safer-default precedent set by the unresolved
     // CUSTOMER_UPDATE gap for Manager/Staff.
     // INVENTORY_ADJUST intentionally NOT included here.
+    Permission.ORDER_CREATE,
+    Permission.ORDER_READ,
+    Permission.ORDER_PROCESS,
+    // Approved Orders RBAC matrix: Staff can create orders and mark
+    // them processed, but cannot update/confirm/cancel/complete.
   ],
   [OrganizationRole.VIEWER]: [
     Permission.ORGANIZATION_VIEW,
@@ -130,5 +157,6 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.CUSTOMER_NOTE_READ,
     Permission.PRODUCT_READ,
     Permission.INVENTORY_READ,
+    Permission.ORDER_READ,
   ],
 };
