@@ -21,6 +21,22 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.OWNERSHIP_TRANSFER,
     Permission.INVOICE_CREATE,
     Permission.INVOICE_APPROVE,
+    // DEFAULT APPLIED, NOT CTO-CONFIRMED (was flagged in the Sprint 5
+    // review as unassigned everywhere including Owner; surfaced again
+    // as an actual test-blocking bug while writing Receipts e2e
+    // tests during Sprint 6). Reasoning: every role with
+    // INVOICE_CREATE should be able to read what it creates;
+    // INVOICE_UPDATE mirrors ORDER_UPDATE's existing Owner/Admin/
+    // Manager pattern; INVOICE_ISSUE mirrors INVOICE_APPROVE
+    // (senior-role, customer-facing action); PAYMENT_CREATE is
+    // conservative Owner/Admin/Manager, same tier as
+    // INVENTORY_ADJUST. Confirm with CTO and replace this comment
+    // once ratified — do not treat as final.
+    Permission.INVOICE_READ,
+    Permission.INVOICE_UPDATE,
+    Permission.INVOICE_ISSUE,
+    Permission.PAYMENT_CREATE,
+    Permission.PAYMENT_READ,
     Permission.INVENTORY_UPDATE,
     Permission.CUSTOMER_CREATE,
     Permission.CUSTOMER_READ,
@@ -41,6 +57,10 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.ORDER_CANCEL,
     Permission.ORDER_PROCESS,
     Permission.ORDER_COMPLETE,
+    Permission.RECEIPT_SETTINGS_READ,
+    Permission.RECEIPT_SETTINGS_UPDATE,
+    Permission.RECEIPT_READ,
+    Permission.RECEIPT_VOID,
   ],
   [OrganizationRole.ADMIN]: [
     Permission.ORGANIZATION_UPDATE,
@@ -54,6 +74,13 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // ownership."
     Permission.INVOICE_CREATE,
     Permission.INVOICE_APPROVE,
+    // DEFAULT APPLIED, NOT CTO-CONFIRMED — see OWNER block above for
+    // full reasoning.
+    Permission.INVOICE_READ,
+    Permission.INVOICE_UPDATE,
+    Permission.INVOICE_ISSUE,
+    Permission.PAYMENT_CREATE,
+    Permission.PAYMENT_READ,
     Permission.INVENTORY_UPDATE,
     Permission.CUSTOMER_CREATE,
     Permission.CUSTOMER_READ,
@@ -74,6 +101,10 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.ORDER_CANCEL,
     Permission.ORDER_PROCESS,
     Permission.ORDER_COMPLETE,
+    Permission.RECEIPT_SETTINGS_READ,
+    Permission.RECEIPT_SETTINGS_UPDATE,
+    Permission.RECEIPT_READ,
+    Permission.RECEIPT_VOID,
   ],
   [OrganizationRole.MANAGER]: [
     Permission.ORGANIZATION_VIEW,
@@ -82,6 +113,13 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // "Manager cannot remove owner" (and, more generally, Manager
     // has no member-removal rights at all in this matrix).
     Permission.INVOICE_CREATE,
+    // DEFAULT APPLIED, NOT CTO-CONFIRMED — see OWNER block above for
+    // full reasoning. No INVOICE_APPROVE/INVOICE_ISSUE for Manager
+    // (Owner/Admin only, mirrors existing senior-action pattern).
+    Permission.INVOICE_READ,
+    Permission.INVOICE_UPDATE,
+    Permission.PAYMENT_CREATE,
+    Permission.PAYMENT_READ,
     Permission.INVENTORY_UPDATE,
     Permission.CUSTOMER_CREATE,
     Permission.CUSTOMER_READ,
@@ -115,6 +153,12 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // Manager gets all order permissions except cancellation.
     Permission.ORDER_PROCESS,
     Permission.ORDER_COMPLETE,
+    Permission.RECEIPT_SETTINGS_READ,
+    // Deliberately no RECEIPT_SETTINGS_UPDATE — Owner/Admin only,
+    // matching ORGANIZATION_UPDATE's existing pattern.
+    Permission.RECEIPT_READ,
+    // Deliberately no RECEIPT_VOID — Owner/Admin only, matching
+    // INVOICE_APPROVE / RECEIPT_SETTINGS_UPDATE's pattern.
   ],
   [OrganizationRole.STAFF]: [
     Permission.ORGANIZATION_VIEW,
@@ -122,6 +166,12 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // Deliberately no MEMBER_INVITE — per CTO acceptance criteria,
     // "Staff cannot invite users."
     Permission.INVOICE_CREATE,
+    // DEFAULT APPLIED, NOT CTO-CONFIRMED — see OWNER block above.
+    // Staff gets INVOICE_READ/PAYMENT_READ (can see what it creates)
+    // but NOT INVOICE_UPDATE/PAYMENT_CREATE — conservative default,
+    // mirrors Staff's existing exclusion from ORDER_UPDATE.
+    Permission.INVOICE_READ,
+    Permission.PAYMENT_READ,
     Permission.CUSTOMER_CREATE,
     Permission.CUSTOMER_READ,
     // See the flagged note in MANAGER above — same gap applies here.
@@ -147,6 +197,8 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.ORDER_PROCESS,
     // Approved Orders RBAC matrix: Staff can create orders and mark
     // them processed, but cannot update/confirm/cancel/complete.
+    Permission.RECEIPT_SETTINGS_READ,
+    Permission.RECEIPT_READ,
   ],
   [OrganizationRole.VIEWER]: [
     Permission.ORGANIZATION_VIEW,
@@ -158,5 +210,9 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.PRODUCT_READ,
     Permission.INVENTORY_READ,
     Permission.ORDER_READ,
+    Permission.INVOICE_READ,
+    Permission.PAYMENT_READ,
+    Permission.RECEIPT_SETTINGS_READ,
+    Permission.RECEIPT_READ,
   ],
 };
