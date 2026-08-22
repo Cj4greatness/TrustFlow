@@ -2,6 +2,7 @@ import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { Customer } from '../../customers/entities/customer.entity';
+import { CustomerAddress } from '../../customers/entities/customer-address.entity';
 import { User } from '../../users/entities/user.entity';
 
 /**
@@ -38,6 +39,15 @@ export enum OrderStatus {
  * via OrderCounter with a pessimistic row lock — see
  * OrdersService.createOrder(), which reuses the concurrency-safe
  * pattern proven in InventoryService.adjustInventory().
+ *
+ * shippingAddressId (Sprint 6 CTO Directive, Delivery foundation):
+ * nullable, references CustomerAddress. RATIFIED this session:
+ * optional at creation, settable any time while DRAFT (same rule as
+ * notes/customerId), but the service layer requires it to be set
+ * before OrdersService.processOrder() can succeed — that's the
+ * moment Delivery auto-creates and genuinely needs a real address.
+ * onDelete: SET NULL, not CASCADE — deleting an address must not
+ * delete the Order it was once attached to.
  */
 @Entity('orders')
 @Index(['organizationId'])
@@ -56,6 +66,13 @@ export class Order extends BaseEntity {
   @ManyToOne(() => Customer, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'customer_id' })
   customer: Customer;
+
+  @Column({ type: 'uuid', name: 'shipping_address_id', nullable: true })
+  shippingAddressId: string | null;
+
+  @ManyToOne(() => CustomerAddress, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'shipping_address_id' })
+  shippingAddress: CustomerAddress | null;
 
   @Column({ type: 'varchar', length: 20, name: 'order_number' })
   orderNumber: string;

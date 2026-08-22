@@ -18,6 +18,7 @@ import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { InventoryService } from '../products/inventory.service';
 import { InventoryMovementType } from '../products/entities/inventory-movement.entity';
+import { InvoicesService } from '../invoices/invoices.service';
 import {
   isTransitionAllowed,
   cancellationRequiresInventoryRestore,
@@ -36,6 +37,7 @@ export class OrdersService {
     private readonly customersService: CustomersService,
     private readonly productsService: ProductsService,
     private readonly inventoryService: InventoryService,
+    private readonly invoicesService: InvoicesService,
   ) {}
 
   async getOwnedOrderOrThrow(
@@ -299,6 +301,16 @@ export class OrdersService {
     }
   }
 
+  /**
+   * RATIFIED: Invoice creation is automatic on Order confirmation.
+   * invoicesService.createInvoiceForOrder() runs inside THIS
+   * transaction (passed `manager`), using lockedOrder — the
+   * pessimistic-locked, status-already-CONFIRMED instance — not the
+   * pre-transaction `order` variable. Same reasoning as the inventory
+   * adjustment loop above it: a lost/failed invoice creation must
+   * roll back the whole confirmation, not leave a CONFIRMED order
+   * with no invoice.
+   */
   async confirmOrder(
     organizationId: string,
     orderId: string,
@@ -334,7 +346,16 @@ export class OrdersService {
         throw new NotFoundException('Order not found');
       }
       lockedOrder.status = OrderStatus.CONFIRMED;
-      return ordersRepo.save(lockedOrder);
+      const savedOrder = await ordersRepo.save(lockedOrder);
+
+      await this.invoicesService.createInvoiceForOrder(
+        savedOrder,
+        items,
+        createdByUserId,
+        manager,
+      );
+
+      return savedOrder;
     });
   }
 

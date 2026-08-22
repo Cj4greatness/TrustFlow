@@ -13,6 +13,7 @@ import { AuthorizationModule } from '../authorization/authorization.module';
 import { OrganizationMembersModule } from '../organization-members/organization-members.module';
 import { CustomersModule } from '../customers/customers.module';
 import { ProductsModule } from '../products/products.module';
+import { InvoicesModule } from '../invoices/invoices.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ProductsModule } from '../products/products.module';
     forwardRef(() => OrganizationMembersModule),
     forwardRef(() => CustomersModule),
     forwardRef(() => ProductsModule),
+    InvoicesModule,
   ],
   controllers: [OrdersController, OrderItemsController],
   providers: [

@@ -9,6 +9,12 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
  * organization-ownership check applied as at creation. status is
  * deliberately excluded — status changes go through the dedicated
  * confirm/cancel/process/complete actions, not a generic PATCH.
+ *
+ * shippingAddressId (Sprint 6): optional here even though it becomes
+ * REQUIRED before processOrder() can succeed — ratified this
+ * session: settable any time while DRAFT (like notes), validated as
+ * required only at the PROCESSING transition, not at creation or
+ * every update.
  */
 export class UpdateOrderDto {
   @ApiPropertyOptional({
@@ -22,4 +28,11 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description: 'UUID of the CustomerAddress to ship this order to',
+  })
+  @IsOptional()
+  @IsUUID()
+  shippingAddressId?: string;
 }
