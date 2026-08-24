@@ -1,5 +1,0 @@
-packages:
-  - "."
-
-overrides:
-  yargs: ^17.7.3

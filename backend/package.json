@@ -96,5 +96,10 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "pnpm": {
+    "overrides": {
+      "yargs": "^17.7.3"
+    }
   }
 }
