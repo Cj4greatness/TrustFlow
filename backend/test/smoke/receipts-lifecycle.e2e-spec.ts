@@ -433,19 +433,19 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
     it("forbids Org B's owner from reaching a specific Org A receipt by ID", async () => {
       const { payment } = await createPaidOrderWithReceipt(150, 1);
       const receipt = await waitForReceipt(payment.id);
-      it("Org B's own receipts list is unaffected by Org A's activity", async () => {
-        const res = await request(server)
-          .get(`/organizations/${orgBId}/receipts`)
-          .set('Authorization', `Bearer ${orgBOwnerToken}`)
-          .expect(200);
-        const orgBReceipts = res.body as ReceiptResponseBody[];
-        expect(orgBReceipts).toHaveLength(0);
-      });
-
       await request(server)
         .get(`/organizations/${orgAId}/receipts/${receipt.id}`)
         .set('Authorization', `Bearer ${orgBOwnerToken}`)
         .expect(403);
+    });
+
+    it("Org B's own receipts list is unaffected by Org A's activity", async () => {
+      const res = await request(server)
+        .get(`/organizations/${orgBId}/receipts`)
+        .set('Authorization', `Bearer ${orgBOwnerToken}`)
+        .expect(200);
+      const orgBReceipts = res.body as ReceiptResponseBody[];
+      expect(orgBReceipts).toHaveLength(0);
     });
   });
 });
