@@ -16,6 +16,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * (POST /organizations/:id/orders/:orderId/items), not embedded in
  * order creation. An order can exist with zero items only in DRAFT
  * (Directive §18 item 8: must have >=1 item before confirmation).
+ *
+ * shippingAddressId (Sprint 6): optional at creation — ratified:
+ * not required until the Order moves to PROCESSING (that's when
+ * Delivery auto-creates and genuinely needs a real address).
  */
 export class CreateOrderDto {
   @ApiProperty({ description: 'UUID of the customer placing this order' })
@@ -26,4 +30,12 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'UUID of the CustomerAddress to ship this order to (can also be set later while DRAFT)',
+  })
+  @IsOptional()
+  @IsUUID()
+  shippingAddressId?: string;
 }

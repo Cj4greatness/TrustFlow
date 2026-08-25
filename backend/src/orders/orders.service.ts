@@ -19,6 +19,8 @@ import { OrderItem } from './entities/order-item.entity';
 import { InventoryService } from '../products/inventory.service';
 import { InventoryMovementType } from '../products/entities/inventory-movement.entity';
 import { InvoicesService } from '../invoices/invoices.service';
+import { DeliveriesService } from '../deliveries/deliveries.service';
+import { CustomerAddress } from '../customers/entities/customer-address.entity';
 import {
   isTransitionAllowed,
   cancellationRequiresInventoryRestore,
@@ -38,6 +40,7 @@ export class OrdersService {
     private readonly productsService: ProductsService,
     private readonly inventoryService: InventoryService,
     private readonly invoicesService: InvoicesService,
+    private readonly deliveriesService: DeliveriesService,
   ) {}
 
   async getOwnedOrderOrThrow(
@@ -65,6 +68,10 @@ export class OrdersService {
       dto.customerId,
     );
 
+    if (dto.shippingAddressId) {
+      await this.getOwnedAddressOrThrow(organizationId, dto.shippingAddressId);
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const ordersRepo = this.ordersRepository.withTransaction(manager);
       const counterRepo = this.orderCounterRepository.withTransaction(manager);
@@ -86,6 +93,7 @@ export class OrdersService {
       const order = ordersRepo.create({
         organizationId,
         customerId: dto.customerId,
+        shippingAddressId: dto.shippingAddressId ?? null,
         orderNumber: this.formatOrderNumber(nextNumber),
         status: OrderStatus.DRAFT,
         subtotal: '0.00',
@@ -110,6 +118,33 @@ export class OrdersService {
     return this.getOwnedOrderOrThrow(organizationId, orderId);
   }
 
+  /**
+   * shippingAddressId (Sprint 6): validated as belonging to this
+   * organization before being set — same reasoning as customerId's
+   * existing check. Does NOT verify the address belongs to the
+   * order's specific customer (a business could plausibly ship to
+   * any of its own addresses on file, not necessarily
+   * customer-owned ones) — org-scoped ownership is the check that
+   * matters for tenant isolation; anything narrower is a business
+   * rule that wasn't specified.
+   */
+  private async getOwnedAddressOrThrow(
+    organizationId: string,
+    addressId: string,
+  ): Promise<CustomerAddress> {
+    const address = await this.dataSource
+      .getRepository(CustomerAddress)
+      .findOne({
+        where: { id: addressId, organizationId },
+      });
+    if (!address) {
+      throw new NotFoundException(
+        `CustomerAddress ${addressId} not found in this organization`,
+      );
+    }
+    return address;
+  }
+
   async updateOrder(
     organizationId: string,
     orderId: string,
@@ -127,10 +162,17 @@ export class OrdersService {
       );
     }
 
+    if (dto.shippingAddressId !== undefined) {
+      await this.getOwnedAddressOrThrow(organizationId, dto.shippingAddressId);
+    }
+
     const updated = this.ordersRepository.create({
       ...existing,
       ...(dto.customerId !== undefined && { customerId: dto.customerId }),
       ...(dto.notes !== undefined && { notes: dto.notes }),
+      ...(dto.shippingAddressId !== undefined && {
+        shippingAddressId: dto.shippingAddressId,
+      }),
     });
 
     return this.ordersRepository.save(updated);
@@ -148,11 +190,6 @@ export class OrdersService {
 
   // -----------------------------------------------------------------
   // Order items
-  //
-  // Every mutation (add/update/remove) and its totals recalculation
-  // run inside one transaction — confirmed decision, so a crash
-  // between "item saved" and "order totals updated" can never leave
-  // Order.subtotal/total out of sync with its actual items.
   // -----------------------------------------------------------------
 
   private async recalculateOrderTotalsTx(
@@ -301,16 +338,6 @@ export class OrdersService {
     }
   }
 
-  /**
-   * RATIFIED: Invoice creation is automatic on Order confirmation.
-   * invoicesService.createInvoiceForOrder() runs inside THIS
-   * transaction (passed `manager`), using lockedOrder — the
-   * pessimistic-locked, status-already-CONFIRMED instance — not the
-   * pre-transaction `order` variable. Same reasoning as the inventory
-   * adjustment loop above it: a lost/failed invoice creation must
-   * roll back the whole confirmation, not leave a CONFIRMED order
-   * with no invoice.
-   */
   async confirmOrder(
     organizationId: string,
     orderId: string,
@@ -359,12 +386,46 @@ export class OrdersService {
     });
   }
 
+  /**
+   * RATIFIED (Sprint 6): Delivery creation is automatic when an
+   * Order moves to PROCESSING — deliveriesService.createDeliveryForOrder()
+   * runs inside THIS transaction, using lockedOrder (the
+   * pessimistic-locked, status-already-PROCESSING instance), same
+   * reasoning as confirmOrder()'s Invoice creation. This method was
+   * NOT transactional before Sprint 6 — became so specifically to
+   * support this.
+   *
+   * shippingAddressId is validated as set BEFORE the transaction
+   * opens (fail fast on bad input, consistent with confirmOrder()
+   * checking items.length === 0 before its transaction too) —
+   * createDeliveryForOrder() also re-checks it inside the
+   * transaction as a defense-in-depth guard, not because this
+   * outer check is expected to be bypassable.
+   */
   async processOrder(organizationId: string, orderId: string): Promise<Order> {
     const order = await this.getOwnedOrderOrThrow(organizationId, orderId);
     this.assertTransitionAllowed(order, OrderStatus.PROCESSING);
 
-    order.status = OrderStatus.PROCESSING;
-    return this.ordersRepository.save(order);
+    if (!order.shippingAddressId) {
+      throw new BadRequestException(
+        `Order ${orderId} must have a shippingAddressId set before it can move to PROCESSING`,
+      );
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const ordersRepo = this.ordersRepository.withTransaction(manager);
+
+      const lockedOrder = await ordersRepo.findByIdForUpdate(orderId);
+      if (!lockedOrder) {
+        throw new NotFoundException('Order not found');
+      }
+      lockedOrder.status = OrderStatus.PROCESSING;
+      const savedOrder = await ordersRepo.save(lockedOrder);
+
+      await this.deliveriesService.createDeliveryForOrder(savedOrder, manager);
+
+      return savedOrder;
+    });
   }
 
   async completeOrder(organizationId: string, orderId: string): Promise<Order> {

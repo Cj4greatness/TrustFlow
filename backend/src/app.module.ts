@@ -16,6 +16,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ReceiptSettingsModule } from './receipt-settings/receipt-settings.module';
 import { ReceiptsModule } from './receipts/receipts.module';
+import { DeliveriesModule } from './deliveries/deliveries.module';
 import { AuditModule } from './audit/audit.module';
 import { SecurityModule } from './security/security.module';
 import { AuthModule } from './auth/auth.module';
@@ -80,6 +81,7 @@ import { envValidationSchema } from './config/env.validation';
     PaymentsModule,
     ReceiptSettingsModule,
     ReceiptsModule,
+    DeliveriesModule,
     AuditModule,
     SecurityModule,
     AuthModule,

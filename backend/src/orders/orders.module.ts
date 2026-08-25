@@ -14,7 +14,7 @@ import { OrganizationMembersModule } from '../organization-members/organization-
 import { CustomersModule } from '../customers/customers.module';
 import { ProductsModule } from '../products/products.module';
 import { InvoicesModule } from '../invoices/invoices.module';
-
+import { DeliveriesModule } from '../deliveries/deliveries.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, OrderItem, OrderCounter]),
@@ -23,6 +23,7 @@ import { InvoicesModule } from '../invoices/invoices.module';
     forwardRef(() => CustomersModule),
     forwardRef(() => ProductsModule),
     InvoicesModule,
+    DeliveriesModule,
   ],
   controllers: [OrdersController, OrderItemsController],
   providers: [
