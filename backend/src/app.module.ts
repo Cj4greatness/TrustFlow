@@ -21,6 +21,7 @@ import { AuditModule } from './audit/audit.module';
 import { SecurityModule } from './security/security.module';
 import { AuthModule } from './auth/auth.module';
 import { AuthorizationModule } from './authorization/authorization.module';
+import { AiModule } from './ai/ai.module';
 import configuration from './config/configuration';
 import { envValidationSchema } from './config/env.validation';
 @Module({
@@ -86,6 +87,7 @@ import { envValidationSchema } from './config/env.validation';
     SecurityModule,
     AuthModule,
     AuthorizationModule,
+    AiModule,
   ],
   controllers: [],
   providers: [],
