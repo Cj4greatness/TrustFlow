@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AIUsage } from './usage/entities/ai-usage.entity';
+import { AIMemory } from './memory/entities/ai-memory.entity';
 import { AiUsageService } from './usage/ai-usage.service';
 import { AiGatewayService } from './gateway/ai.gateway';
 import { AI_PROVIDER, AIProvider } from './gateway/ai-provider.interface';
@@ -36,7 +37,7 @@ import { AppConfig } from '../config/configuration';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([AIUsage]),
+    TypeOrmModule.forFeature([AIUsage, AIMemory]),
     forwardRef(() => AuthorizationModule),
     forwardRef(() => OrganizationMembersModule),
   ],

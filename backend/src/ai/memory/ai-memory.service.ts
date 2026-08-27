@@ -1,41 +1,85 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { AIMemory } from './entities/ai-memory.entity';
 import { MemoryScope, AIMemoryRecord } from './ai-memory.types';
 
 /**
  * AiMemoryService
  *
- * S7-01 §7. Interface is locked; persistence is NOT — whether this
- * is actually backed by a database table, or ships boundary-only,
- * is still an open decision. This implementation intentionally
- * throws rather than silently no-op'ing, so nothing can accidentally
- * depend on memory "working" before that decision is made and a real
- * backing store (an AIMemory entity + migration, per directive §13)
- * is implemented.
+ * S7-01 §7. Backed by the ai_memory table. One row per
+ * (organizationId, userId, key) — set() upserts via the unique
+ * constraint, so repeated writes to the same key overwrite rather
+ * than accumulate.
  *
  * Business data (Orders, Invoices, Payments, Customers, Inventory)
  * must never be written here — this service is reserved for
  * intentionally-retained conversational/preference context only
- * (directive §6).
+ * (directive §6). Enforcing that boundary is a design/review
+ * responsibility of callers, not something this service checks
+ * mechanically.
  */
-/* eslint-disable @typescript-eslint/no-unused-vars -- documented
-   interface params, kept for the future real implementation */
 @Injectable()
 export class AiMemoryService {
-  get(scope: MemoryScope, key: string): Promise<AIMemoryRecord | null> {
-    throw new Error('AiMemoryService has no backing store yet.');
+  constructor(
+    @InjectRepository(AIMemory)
+    private readonly memoryRepository: Repository<AIMemory>,
+  ) {}
+
+  async get(scope: MemoryScope, key: string): Promise<AIMemoryRecord | null> {
+    const record = await this.memoryRepository.findOne({
+      where: {
+        organizationId: scope.organizationId,
+        userId: scope.userId,
+        key,
+      },
+    });
+    if (!record) return null;
+    return {
+      key: record.key,
+      content: record.content,
+      metadata: record.metadata,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
   }
 
-  set(
+  async set(
     scope: MemoryScope,
     key: string,
     content: string,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
-    throw new Error('AiMemoryService has no backing store yet.');
+    const existing = await this.memoryRepository.findOne({
+      where: {
+        organizationId: scope.organizationId,
+        userId: scope.userId,
+        key,
+      },
+    });
+
+    if (existing) {
+      existing.content = content;
+      existing.metadata = metadata ?? null;
+      await this.memoryRepository.save(existing);
+      return;
+    }
+
+    const record = this.memoryRepository.create({
+      organizationId: scope.organizationId,
+      userId: scope.userId,
+      key,
+      content,
+      metadata: metadata ?? null,
+    });
+    await this.memoryRepository.save(record);
   }
 
-  delete(scope: MemoryScope, key: string): Promise<void> {
-    throw new Error('AiMemoryService has no backing store yet.');
+  async delete(scope: MemoryScope, key: string): Promise<void> {
+    await this.memoryRepository.delete({
+      organizationId: scope.organizationId,
+      userId: scope.userId,
+      key,
+    });
   }
 }
-/* eslint-enable @typescript-eslint/no-unused-vars */
