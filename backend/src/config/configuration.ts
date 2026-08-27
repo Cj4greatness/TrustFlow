@@ -26,6 +26,13 @@ export interface AppConfig {
     refreshSecret: string;
     refreshExpiresIn: string;
   };
+  ai: {
+    anthropic: {
+      /** Optional — if unset, the AI Gateway falls back to a safe placeholder provider that fails loud on use rather than silently no-op'ing. */
+      apiKey: string | undefined;
+      model: string;
+    };
+  };
 }
 
 export default (): AppConfig => ({
@@ -47,5 +54,11 @@ export default (): AppConfig => ({
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
     refreshSecret: process.env.JWT_REFRESH_SECRET!,
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+  },
+  ai: {
+    anthropic: {
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6',
+    },
   },
 });

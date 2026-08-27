@@ -25,4 +25,11 @@ export const envValidationSchema = Joi.object({
   JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
+
+  // Optional: if unset, the AI Gateway falls back to a placeholder
+  // provider that fails loud on use rather than silently no-op'ing.
+  // Not required at boot so existing dev/CI environments without a
+  // key keep working.
+  ANTHROPIC_API_KEY: Joi.string().optional(),
+  ANTHROPIC_MODEL: Joi.string().default('claude-sonnet-4-6'),
 });
