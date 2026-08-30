@@ -65,7 +65,7 @@ jobs:
       JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-only-refresh-secret-not-for-real-use-32char' }}
       JWT_REFRESH_EXPIRES_IN: 7d
 
-      steps:
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
 
