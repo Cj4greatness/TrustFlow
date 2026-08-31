@@ -35,6 +35,7 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
   let orgId: string;
   let userId: string;
   let customerId: string;
+  let shippingAddressId: string;
 
   const runId = randomUUID().slice(0, 8);
   const sku = () => `ORD-SKU-${randomUUID().slice(0, 8)}`;
@@ -83,6 +84,13 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
       userId,
     );
     customerId = customer.id;
+
+    const address = await customersService.addAddress(orgId, customerId, {
+      line1: '12 Admiralty Way',
+      city: 'Lekki',
+      country: 'Nigeria',
+    });
+    shippingAddressId = address.id;
   }, 30000);
 
   afterAll(async () => {
@@ -322,7 +330,7 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
 
       const order = await ordersService.createOrder(
         orgId,
-        { customerId },
+        { customerId, shippingAddressId },
         userId,
       );
       await ordersService.addOrderItem(orgId, order.id, {
@@ -330,11 +338,9 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
         quantity: 1,
       });
       await ordersService.confirmOrder(orgId, order.id, userId);
-
       await expect(
         ordersService.completeOrder(orgId, order.id),
       ).rejects.toThrow(BadRequestException);
-
       const processed = await ordersService.processOrder(orgId, order.id);
       expect(processed.status).toBe(OrderStatus.PROCESSING);
 
@@ -358,7 +364,7 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
 
     const order = await ordersService.createOrder(
       orgId,
-      { customerId },
+      { customerId, shippingAddressId },
       userId,
     );
     await ordersService.addOrderItem(orgId, order.id, {
