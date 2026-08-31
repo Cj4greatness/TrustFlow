@@ -71,8 +71,6 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -105,4 +103,3 @@ jobs:
 
       - name: Run e2e tests (includes invitation lifecycle smoke test)
         run: pnpm run test:e2e
-
