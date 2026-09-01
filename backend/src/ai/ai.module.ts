@@ -16,7 +16,10 @@ import { AuthorizationModule } from '../authorization/authorization.module';
 import { OrganizationMembersModule } from '../organization-members/organization-members.module';
 import { CustomersModule } from '../customers/customers.module';
 import { CustomersService } from '../customers/customers.service';
+import { OrdersModule } from '../orders/orders.module';
+import { OrdersService } from '../orders/orders.service';
 import { createGetCustomerTool } from './tools/get-customer.tool';
+import { createGetOrderTool } from './tools/get-order.tool';
 import { AppConfig } from '../config/configuration';
 
 /**
@@ -44,6 +47,7 @@ import { AppConfig } from '../config/configuration';
     forwardRef(() => AuthorizationModule),
     forwardRef(() => OrganizationMembersModule),
     forwardRef(() => CustomersModule),
+    forwardRef(() => OrdersModule),
   ],
   providers: [
     AiUsageService,
@@ -80,9 +84,11 @@ export class AiModule implements OnModuleInit {
   constructor(
     private readonly aiToolRegistry: AiToolRegistry,
     private readonly customersService: CustomersService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   onModuleInit(): void {
     this.aiToolRegistry.register(createGetCustomerTool(this.customersService));
+    this.aiToolRegistry.register(createGetOrderTool(this.ordersService));
   }
 }

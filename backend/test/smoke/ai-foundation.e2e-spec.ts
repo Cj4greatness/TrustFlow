@@ -25,7 +25,7 @@ import { UsersService } from '../../src/users/users.service';
 import { OrganizationsService } from '../../src/organizations/organizations.service';
 import { PasswordService } from '../../src/security/password.service';
 import { CustomersService } from '../../src/customers/customers.service';
-
+import { OrdersService } from '../../src/orders/orders.service';
 /**
  * AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)
  *
@@ -52,6 +52,7 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
   let orgBId: string;
   let userId: string;
   let customerId: string;
+  let orderId: string;
 
   const runId = randomUUID().slice(0, 8);
 
@@ -112,6 +113,14 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
       userId,
     );
     customerId = customer.id;
+
+    const ordersService = app.get(OrdersService);
+    const order = await ordersService.createOrder(
+      orgAId,
+      { customerId, notes: 'AI foundation e2e fixture' },
+      userId,
+    );
+    orderId = order.id;
 
     const testTool: AiTool<TestToolInput, { result: string }> = {
       name: 'test_adjust_inventory',
@@ -328,6 +337,45 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
         aiToolRegistry.execute(
           'get_customer',
           { customerId },
+          {
+            organizationId: orgBId,
+            memberId: userId,
+            role: OrganizationRole.OWNER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('get_order tool — real Tool Registry entry', () => {
+    it('is registered at module bootstrap', () => {
+      const tools = aiToolRegistry.list();
+      expect(tools.some((t) => t.name === 'get_order')).toBe(true);
+    });
+
+    it("fetches an order's header fields", async () => {
+      const result = (await aiToolRegistry.execute(
+        'get_order',
+        { orderId },
+        {
+          organizationId: orgAId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          requestId: randomUUID(),
+        },
+      )) as { orderNumber: string; customerId: string; status: string };
+
+      expect(result.customerId).toBe(customerId);
+      expect(result.orderNumber).toMatch(/^TF-\d{6}$/);
+      expect(result.status).toBe('draft');
+    });
+
+    it("rejects fetching Org A's order under Org B's context", async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_order',
+          { orderId },
           {
             organizationId: orgBId,
             memberId: userId,
