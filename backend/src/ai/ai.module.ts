@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module, forwardRef, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AIUsage } from './usage/entities/ai-usage.entity';
@@ -14,6 +14,12 @@ import { AiMemoryService } from './memory/ai-memory.service';
 import { AiEventConsumer } from './events/ai-event.consumer';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { OrganizationMembersModule } from '../organization-members/organization-members.module';
+import { CustomersModule } from '../customers/customers.module';
+import { CustomersService } from '../customers/customers.service';
+import { OrdersModule } from '../orders/orders.module';
+import { OrdersService } from '../orders/orders.service';
+import { createGetCustomerTool } from './tools/get-customer.tool';
+import { createGetOrderTool } from './tools/get-order.tool';
 import { AppConfig } from '../config/configuration';
 
 /**
@@ -40,6 +46,8 @@ import { AppConfig } from '../config/configuration';
     TypeOrmModule.forFeature([AIUsage, AIMemory]),
     forwardRef(() => AuthorizationModule),
     forwardRef(() => OrganizationMembersModule),
+    forwardRef(() => CustomersModule),
+    forwardRef(() => OrdersModule),
   ],
   providers: [
     AiUsageService,
@@ -72,4 +80,15 @@ import { AppConfig } from '../config/configuration';
     AiUsageService,
   ],
 })
-export class AiModule {}
+export class AiModule implements OnModuleInit {
+  constructor(
+    private readonly aiToolRegistry: AiToolRegistry,
+    private readonly customersService: CustomersService,
+    private readonly ordersService: OrdersService,
+  ) {}
+
+  onModuleInit(): void {
+    this.aiToolRegistry.register(createGetCustomerTool(this.customersService));
+    this.aiToolRegistry.register(createGetOrderTool(this.ordersService));
+  }
+}
