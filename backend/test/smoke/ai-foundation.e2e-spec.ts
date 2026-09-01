@@ -24,6 +24,7 @@ import { OrganizationRole } from '../../src/organization-members/entities/organi
 import { UsersService } from '../../src/users/users.service';
 import { OrganizationsService } from '../../src/organizations/organizations.service';
 import { PasswordService } from '../../src/security/password.service';
+import { CustomersService } from '../../src/customers/customers.service';
 
 /**
  * AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)
@@ -50,6 +51,7 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
   let orgAId: string;
   let orgBId: string;
   let userId: string;
+  let customerId: string;
 
   const runId = randomUUID().slice(0, 8);
 
@@ -98,6 +100,18 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
       userId,
     );
     orgBId = orgB.id;
+
+    const customersService = app.get(CustomersService);
+    const customer = await customersService.createCustomer(
+      orgAId,
+      {
+        customerType: 'individual',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      } as never,
+      userId,
+    );
+    customerId = customer.id;
 
     const testTool: AiTool<TestToolInput, { result: string }> = {
       name: 'test_adjust_inventory',
@@ -284,6 +298,44 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
           },
         ),
       ).rejects.toThrow(AiToolInputValidationError);
+    });
+  });
+
+  describe('get_customer tool — real Tool Registry entry', () => {
+    it('is registered at module bootstrap', () => {
+      const tools = aiToolRegistry.list();
+      expect(tools.some((t) => t.name === 'get_customer')).toBe(true);
+    });
+
+    it("fetches a customer's business-relevant fields", async () => {
+      const result = (await aiToolRegistry.execute(
+        'get_customer',
+        { customerId },
+        {
+          organizationId: orgAId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          requestId: randomUUID(),
+        },
+      )) as { displayName: string; firstName: string | null };
+
+      expect(result.firstName).toBe('Ada');
+      expect(result.displayName).toContain('Ada');
+    });
+
+    it("rejects fetching Org A's customer under Org B's context", async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_customer',
+          { customerId },
+          {
+            organizationId: orgBId,
+            memberId: userId,
+            role: OrganizationRole.OWNER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow();
     });
   });
 });
