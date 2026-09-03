@@ -59,7 +59,16 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.DELIVERY_ASSIGN,
     Permission.DELIVERY_TRANSITION,
     Permission.DELIVERY_CANCEL,
+    // ADDED FOR AI TOOL FOUNDATION (unlike every other _READ
+    // permission, which is granted to all five roles): the Supplier
+    // permission matrix was never wired into this table at all
+    // (Sprint 4 gap, distinct from the three already-flagged
+    // deferrals). Owner-only was a deliberate choice to unblock
+    // get_supplier, not a match to the codebase's established
+    // pattern — full SUPPLIER_* matrix still needs CTO review.
+    Permission.SUPPLIER_READ,
   ],
+
   [OrganizationRole.ADMIN]: [
     Permission.ORGANIZATION_UPDATE,
     Permission.ORGANIZATION_VIEW,

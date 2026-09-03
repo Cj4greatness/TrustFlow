@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../../src/app.module';
 import { AiGatewayService } from '../../src/ai/gateway/ai.gateway';
@@ -26,6 +26,13 @@ import { OrganizationsService } from '../../src/organizations/organizations.serv
 import { PasswordService } from '../../src/security/password.service';
 import { CustomersService } from '../../src/customers/customers.service';
 import { OrdersService } from '../../src/orders/orders.service';
+import { ProductsService } from '../../src/products/products.service';
+import { SuppliersService } from '../../src/suppliers/suppliers.service';
+import { InvoicesService } from '../../src/invoices/invoices.service';
+import { DeliveriesService } from '../../src/deliveries/deliveries.service';
+import { PaymentsService } from '../../src/payments/payments.service';
+import { InventoryService } from '../../src/products/inventory.service';
+import { InventoryMovementType } from '../../src/products/entities/inventory-movement.entity';
 /**
  * AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)
  *
@@ -53,6 +60,11 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
   let userId: string;
   let customerId: string;
   let orderId: string;
+  let productId: string;
+  let supplierId: string;
+  let invoiceId: string;
+  let deliveryId: string;
+  let paymentId: string;
 
   const runId = randomUUID().slice(0, 8);
 
@@ -121,6 +133,88 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
       userId,
     );
     orderId = order.id;
+
+    const productsService = app.get(ProductsService);
+    const product = await productsService.createProduct(
+      orgAId,
+      { name: 'AI Fixture Widget', sku: `WIDGET-${runId}`, sellingPrice: 1000 },
+      userId,
+    );
+    productId = product.id;
+
+    // Stock the product before it's added to an order — confirmOrder()
+    // deducts inventory via InventoryService.adjustInventory(), which
+    // requires an EntityManager (it's normally called from inside
+    // OrdersService.confirmOrder()'s own transaction). We open an
+    // equivalent transaction here purely for this fixture step, mirroring
+    // that call shape exactly rather than guessing at a non-transactional
+    // overload.
+    const inventoryService = app.get(InventoryService);
+    const dataSource = app.get(DataSource);
+    await dataSource.transaction(async (manager) => {
+      await inventoryService.adjustInventory(
+        orgAId,
+        productId,
+        {
+          type: InventoryMovementType.ADD,
+          quantity: 10,
+          reason: 'AI fixture stock',
+        },
+        userId,
+        manager,
+      );
+    });
+
+    await ordersService.addOrderItem(orgAId, orderId, {
+      productId,
+      quantity: 2,
+    });
+
+    const address = await customersService.addAddress(orgAId, customerId, {
+      line1: '12 Admiralty Way',
+      city: 'Lekki',
+      country: 'Nigeria',
+    });
+
+    await ordersService.updateOrder(orgAId, orderId, {
+      shippingAddressId: address.id,
+    });
+
+    await ordersService.confirmOrder(orgAId, orderId, userId);
+    await ordersService.processOrder(orgAId, orderId);
+
+    const invoicesService = app.get(InvoicesService);
+    const invoices = await invoicesService.listInvoices(orgAId);
+    const invoiceForOrder = invoices.find((inv) => inv.orderId === orderId);
+    if (!invoiceForOrder) {
+      throw new Error('Fixture setup: no invoice found for order');
+    }
+    invoiceId = invoiceForOrder.id;
+
+    const deliveriesService = app.get(DeliveriesService);
+    const deliveries = await deliveriesService.listDeliveries(orgAId);
+    const deliveryForOrder = deliveries.find((d) => d.orderId === orderId);
+    if (!deliveryForOrder) {
+      throw new Error('Fixture setup: no delivery found for order');
+    }
+    deliveryId = deliveryForOrder.id;
+
+    const paymentsService = app.get(PaymentsService);
+    const payment = await paymentsService.recordPayment(
+      invoiceId,
+      { idempotencyKey: `ai-fixture-payment-${runId}`, amount: 1000 },
+      orgAId,
+      userId,
+    );
+    paymentId = payment.id;
+
+    const suppliersService = app.get(SuppliersService);
+    const supplier = await suppliersService.createSupplier(
+      orgAId,
+      { name: 'AI Fixture Supplies Ltd' },
+      userId,
+    );
+    supplierId = supplier.id;
 
     const testTool: AiTool<TestToolInput, { result: string }> = {
       name: 'test_adjust_inventory',
@@ -368,7 +462,7 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
 
       expect(result.customerId).toBe(customerId);
       expect(result.orderNumber).toMatch(/^TF-\d{6}$/);
-      expect(result.status).toBe('draft');
+      expect(result.status).toBe('processing');
     });
 
     it("rejects fetching Org A's order under Org B's context", async () => {
@@ -376,6 +470,195 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
         aiToolRegistry.execute(
           'get_order',
           { orderId },
+          {
+            organizationId: orgBId,
+            memberId: userId,
+            role: OrganizationRole.OWNER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('get_invoice tool — real Tool Registry entry', () => {
+    it('is registered at module bootstrap', () => {
+      const tools = aiToolRegistry.list();
+      expect(tools.some((t) => t.name === 'get_invoice')).toBe(true);
+    });
+
+    it("fetches an invoice's fields", async () => {
+      const result = (await aiToolRegistry.execute(
+        'get_invoice',
+        { invoiceId },
+        {
+          organizationId: orgAId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          requestId: randomUUID(),
+        },
+      )) as { orderId: string; invoiceNumber: string };
+
+      expect(result.orderId).toBe(orderId);
+      expect(result.invoiceNumber).toMatch(/^INV-\d{4}-\d{6}$/);
+    });
+
+    it("rejects fetching Org A's invoice under Org B's context", async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_invoice',
+          { invoiceId },
+          {
+            organizationId: orgBId,
+            memberId: userId,
+            role: OrganizationRole.OWNER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('get_delivery tool — real Tool Registry entry', () => {
+    it('is registered at module bootstrap', () => {
+      const tools = aiToolRegistry.list();
+      expect(tools.some((t) => t.name === 'get_delivery')).toBe(true);
+    });
+
+    it("fetches a delivery's fields", async () => {
+      const result = (await aiToolRegistry.execute(
+        'get_delivery',
+        { deliveryId },
+        {
+          organizationId: orgAId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          requestId: randomUUID(),
+        },
+      )) as { orderId: string; status: string };
+
+      expect(result.orderId).toBe(orderId);
+      expect(result.status).toBe('pending');
+    });
+
+    it("rejects fetching Org A's delivery under Org B's context", async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_delivery',
+          { deliveryId },
+          {
+            organizationId: orgBId,
+            memberId: userId,
+            role: OrganizationRole.OWNER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('get_product tool — real Tool Registry entry', () => {
+    it('is registered at module bootstrap', () => {
+      const tools = aiToolRegistry.list();
+      expect(tools.some((t) => t.name === 'get_product')).toBe(true);
+    });
+
+    it("fetches a product's fields", async () => {
+      const result = (await aiToolRegistry.execute(
+        'get_product',
+        { productId },
+        {
+          organizationId: orgAId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          requestId: randomUUID(),
+        },
+      )) as { name: string; sku: string };
+
+      expect(result.name).toBe('AI Fixture Widget');
+      expect(result.sku).toBe(`WIDGET-${runId}`);
+    });
+
+    it("rejects fetching Org A's product under Org B's context", async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_product',
+          { productId },
+          {
+            organizationId: orgBId,
+            memberId: userId,
+            role: OrganizationRole.OWNER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('get_supplier tool — real Tool Registry entry', () => {
+    it('is registered at module bootstrap', () => {
+      const tools = aiToolRegistry.list();
+      expect(tools.some((t) => t.name === 'get_supplier')).toBe(true);
+    });
+
+    it("fetches a supplier's fields", async () => {
+      const result = (await aiToolRegistry.execute(
+        'get_supplier',
+        { supplierId },
+        {
+          organizationId: orgAId,
+          memberId: userId,
+          role: OrganizationRole.OWNER,
+          requestId: randomUUID(),
+        },
+      )) as { name: string };
+
+      expect(result.name).toBe('AI Fixture Supplies Ltd');
+    });
+
+    it("rejects fetching Org A's supplier under Org B's context", async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_supplier',
+          { supplierId },
+          {
+            organizationId: orgBId,
+            memberId: userId,
+            role: OrganizationRole.OWNER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('get_payment tool — real Tool Registry entry', () => {
+    it('is registered at module bootstrap', () => {
+      const tools = aiToolRegistry.list();
+      expect(tools.some((t) => t.name === 'get_payment')).toBe(true);
+    });
+
+    it("fetches a payment's fields", async () => {
+      const result = (await aiToolRegistry.execute(
+        'get_payment',
+        { paymentId },
+        {
+          organizationId: orgAId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          requestId: randomUUID(),
+        },
+      )) as { invoiceId: string; amount: number };
+
+      expect(result.invoiceId).toBe(invoiceId);
+      expect(result.amount).toBe(1000);
+    });
+
+    it("rejects fetching Org A's payment under Org B's context", async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_payment',
+          { paymentId },
           {
             organizationId: orgBId,
             memberId: userId,

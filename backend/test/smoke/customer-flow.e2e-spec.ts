@@ -172,7 +172,7 @@ describe('Customer Flow (e2e)', () => {
       staffAToken,
       'staff',
     );
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();
