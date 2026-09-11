@@ -248,8 +248,8 @@ source ~/.bashrc
 
 ## Team
 
-- **Founder** — Vision & Product
+- **Founder** — Chisom Johnson
 - **CTO** — Architecture & Technical Direction
-- **Engineer** — Implementation
+- **Engineer** — Chisom Johnson
 
 Built one sprint at a time, foundation before features.
