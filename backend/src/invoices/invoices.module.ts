@@ -12,18 +12,19 @@ import { OrganizationMembersModule } from '../organization-members/organization-
 /**
  * InvoicesModule
  *
- * Order is imported into the feature module via TypeOrmModule so
- * InvoicesService can read it through the injected EntityManager
- * inside its transaction, without owning Order's repository or
- * importing OrdersModule wholesale — avoids a circular dependency
- * between Orders and Invoices.
- *
- * AuthorizationModule + OrganizationMembersModule (both forwardRef,
- * matching OrdersModule's exact pair) were both missing until the
- * Finance e2e suite surfaced it in two rounds — PermissionsGuard
- * needs AuthorizationService AND OrganizationMembersRepository.
- * TypeScript's compiler has no visibility into DI resolution, so
- * this compiled cleanly the whole time despite being unable to boot.
+ * InvoicesService.createInvoiceForOrder() takes an already-fetched
+ *Order as a parameter — the caller (OrdersService.confirmOrder())
+ *fetches it and passes it in directly, inside its own transaction.
+ *InvoicesModule does NOT register Order via TypeOrmModule and never
+ *reads it through an injected EntityManager; it has no repository
+ *ownership of Order and does not import OrdersModule, avoiding a
+ *circular dependency between Orders and Invoices.
+ *AuthorizationModule + OrganizationMembersModule (both forwardRef,
+ *matching OrdersModule's exact pair) were both missing until the
+ *Finance e2e suite surfaced it in two rounds — PermissionsGuard
+ *needs AuthorizationService AND OrganizationMembersRepository.
+ *TypeScript's compiler has no visibility into DI resolution, so
+ *this compiled cleanly the whole time despite being unable to boot.
  */
 @Module({
   imports: [
