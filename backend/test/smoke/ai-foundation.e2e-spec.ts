@@ -19,6 +19,7 @@ import {
   AiToolInputValidationError,
   AiToolUnauthorizedError,
 } from '../../src/ai/tools/ai-tool.interface';
+import { AiContextService } from '../../src/ai/context/ai-context.service';
 import { Permission } from '../../src/authorization/permissions.enum';
 import { OrganizationRole } from '../../src/organization-members/entities/organization-member.entity';
 import { UsersService } from '../../src/users/users.service';
@@ -54,6 +55,7 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
   let aiUsageService: AiUsageService;
   let aiMemoryService: AiMemoryService;
   let aiToolRegistry: AiToolRegistry;
+  let aiContextService: AiContextService;
   let usageRepository: Repository<AIUsage>;
   let orgAId: string;
   let orgBId: string;
@@ -84,6 +86,7 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
     aiUsageService = app.get(AiUsageService);
     aiMemoryService = app.get(AiMemoryService);
     aiToolRegistry = app.get(AiToolRegistry);
+    aiContextService = app.get(AiContextService);
     usageRepository = app.get(getRepositoryToken(AIUsage));
 
     const usersService = app.get(UsersService);
@@ -667,6 +670,85 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
           },
         ),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('AiContextService — Context Engine operations', () => {
+    it('assembles order_summary with a resolved customer name', async () => {
+      const result = await aiContextService.assemble({
+        organizationId: orgAId,
+        memberId: userId,
+        role: OrganizationRole.VIEWER,
+        operation: 'order_summary',
+        params: { orderId },
+      });
+
+      expect(result.operation).toBe('order_summary');
+      expect(result.data.customerName).toContain('Ada');
+      expect(result.data.itemCount).toBe(1);
+    });
+
+    it('rejects order_summary for an order outside the caller organization', async () => {
+      await expect(
+        aiContextService.assemble({
+          organizationId: orgBId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          operation: 'order_summary',
+          params: { orderId },
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('assembles customer_summary with profile fields', async () => {
+      const result = await aiContextService.assemble({
+        organizationId: orgAId,
+        memberId: userId,
+        role: OrganizationRole.VIEWER,
+        operation: 'customer_summary',
+        params: { customerId },
+      });
+
+      expect(result.operation).toBe('customer_summary');
+      expect(result.data.displayName).toContain('Ada');
+    });
+
+    it('rejects customer_summary for a customer outside the caller organization', async () => {
+      await expect(
+        aiContextService.assemble({
+          organizationId: orgBId,
+          memberId: userId,
+          role: OrganizationRole.VIEWER,
+          operation: 'customer_summary',
+          params: { customerId },
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('assembles inventory_summary scoped to the caller organization', async () => {
+      const result = await aiContextService.assemble({
+        organizationId: orgAId,
+        memberId: userId,
+        role: OrganizationRole.VIEWER,
+        operation: 'inventory_summary',
+        params: {},
+      });
+
+      expect(result.operation).toBe('inventory_summary');
+      expect(result.data.totalSkus).toBe(1);
+      expect(result.data.outOfStockCount).toBe(0);
+    });
+
+    it("keeps Org A's inventory invisible from Org B's inventory_summary", async () => {
+      const result = await aiContextService.assemble({
+        organizationId: orgBId,
+        memberId: userId,
+        role: OrganizationRole.VIEWER,
+        operation: 'inventory_summary',
+        params: {},
+      });
+
+      expect(result.data.totalSkus).toBe(0);
     });
   });
 });
