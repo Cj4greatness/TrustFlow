@@ -131,8 +131,16 @@ export class PaymentsService {
     return result;
   }
 
-  async getPayment(id: string, organizationId: string): Promise<Payment> {
-    return this.paymentsRepository.getOwnedPaymentOrThrow(id, organizationId);
+  async getPayment(
+    id: string,
+    organizationId: string,
+    invoiceId?: string,
+  ): Promise<Payment> {
+    return this.paymentsRepository.getOwnedPaymentOrThrow(
+      id,
+      organizationId,
+      invoiceId,
+    );
   }
 
   async listPaymentsForInvoice(
