@@ -362,6 +362,11 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
     });
 
     it('rejects execution when the role lacks the required permission', async () => {
+      // Staff was CTO-ratified to hold INVENTORY_ADJUST (see
+      // permission-matrix.ts / RBAC Ratification Decision Record),
+      // so Viewer — the only role still excluded — is used here
+      // instead, to keep this asserting a genuine "lacks permission"
+      // case rather than one invalidated by the ratification.
       await expect(
         aiToolRegistry.execute(
           'test_adjust_inventory',
@@ -369,7 +374,7 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
           {
             organizationId: orgAId,
             memberId: userId,
-            role: OrganizationRole.STAFF,
+            role: OrganizationRole.VIEWER,
             requestId: randomUUID(),
           },
         ),
