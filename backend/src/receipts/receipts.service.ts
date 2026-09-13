@@ -11,7 +11,7 @@ import { Receipt, ReceiptStatus } from './entities/receipt.entity';
 import { ReceiptCounter } from './entities/receipt-counter.entity';
 import { ReceiptsRepository } from './receipts.repository';
 import { ReceiptSettingsService } from '../receipt-settings/receipt-settings.service';
-import { Payment } from '../payments/entities/payment.entity';
+import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
@@ -175,6 +175,27 @@ export class ReceiptsService {
     return this.dataSource.getRepository(Receipt).save(receipt);
   }
 
+  async regenerateReceipt(
+    paymentId: string,
+    organizationId: string,
+  ): Promise<Receipt> {
+    const payment = await this.dataSource.getRepository(Payment).findOne({
+      where: { id: paymentId, organizationId },
+    });
+    if (!payment) {
+      throw new NotFoundException(
+        `Payment ${paymentId} not found — cannot regenerate receipt`,
+      );
+    }
+
+    if (payment.status !== PaymentStatus.SUCCESS) {
+      throw new BadRequestException(
+        `Payment ${paymentId} is not eligible for a receipt (status: ${payment.status})`,
+      );
+    }
+
+    return this.createReceiptForPayment(paymentId, organizationId);
+  }
   private async nextReceiptNumber(
     organizationId: string,
     manager: EntityManager,

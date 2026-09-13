@@ -7,31 +7,13 @@ import { AppModule } from '../../src/app.module';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { ReceiptsService } from '../../src/receipts/receipts.service';
 import { ReceiptSettingsService } from '../../src/receipt-settings/receipt-settings.service';
-
-/**
- * Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)
- *
- * Sprint 6 CTO Directive §37-§39. Drives the real Order -> Invoice ->
- * Payment -> Receipt chain over HTTP for most assertions, matching
- * the receipt-settings-rbac.e2e-spec.ts / product-inventory-rbac.e2e-
- * spec.ts pattern.
- *
- * ONE deliberate exception: the idempotency test calls
- * ReceiptsService.handlePaymentSucceeded() directly (not via HTTP),
- * twice, with an identical event payload. A real duplicate
- * payment.succeeded emission can't be triggered through the API — a
- * given Payment only succeeds once — so this is the only way to
- * actually exercise the (organizationId, paymentId) uniqueness
- * safety net described in Receipt's class doc.
- *
- * POLLING NOTE: PaymentsService uses eventEmitter.emit(), not
- * emitAsync() — the payment POST response returns before the Receipt
- * listener necessarily finishes. Tests that check for a receipt
- * after a payment poll with retries rather than asserting
- * immediately; this is a direct, observable consequence of choosing
- * event-driven Receipt creation, not a test-flakiness workaround for
- * a bug.
- */
+import { DataSource } from 'typeorm';
+import { Receipt } from '../../src/receipts/entities/receipt.entity';
+import {
+  Payment,
+  PaymentStatus,
+  PaymentMethod,
+} from '../../src/payments/entities/payment.entity';
 
 interface AuthResponseBody {
   accessToken: string;
@@ -76,6 +58,7 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
   let server: App;
   let receiptsService: ReceiptsService;
   let receiptSettingsService: ReceiptSettingsService;
+  let dataSource: DataSource;
 
   const runId = randomUUID().slice(0, 8);
   const PASSWORD = 'SecurePass123';
@@ -130,13 +113,6 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
       .expect(204);
   };
 
-  /**
-   * Full chain helper: creates a product, an order, adds one item,
-   * confirms the order (auto-creates the Invoice), and records a
-   * payment covering it in full — returns the payment so the caller
-   * can poll for the resulting receipt. Shared across most tests
-   * below so each one isn't re-deriving five HTTP calls.
-   */
   const createPaidOrderWithReceipt = async (
     unitPrice: number,
     quantity: number,
@@ -199,11 +175,6 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
     };
   };
 
-  /**
-   * Polls GET /receipts for a receipt matching the given paymentId,
-   * up to ~2s — the fire-and-forget emit() means the receipt may not
-   * exist the instant the payment POST returns.
-   */
   const waitForReceipt = async (
     paymentId: string,
   ): Promise<ReceiptResponseBody> => {
@@ -240,6 +211,7 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
     server = app.getHttpServer();
     receiptsService = app.get(ReceiptsService);
     receiptSettingsService = app.get(ReceiptSettingsService);
+    dataSource = app.get(DataSource);
 
     ownerToken = await registerAndLogin(ownerEmail, 'RCOwner');
     adminToken = await registerAndLogin(adminEmail, 'RCAdmin');
@@ -361,8 +333,6 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
         const { payment } = await createPaidOrderWithReceipt(300, 1);
         await waitForReceipt(payment.id);
 
-        // Simulate the event firing a second time for the same
-        // payment — the real failure mode this guards against.
         await receiptsService.handlePaymentSucceeded({
           paymentId: payment.id,
           invoiceId: '',
@@ -446,6 +416,139 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
         .expect(200);
       const orgBReceipts = res.body as ReceiptResponseBody[];
       expect(orgBReceipts).toHaveLength(0);
+    });
+  });
+
+  describe('Regenerate — recovery mechanism (Backend Readiness & Freeze Audit, Section 3)', () => {
+    it('creates the missing receipt when none exists for a successful payment', async () => {
+      const { payment } = await createPaidOrderWithReceipt(400, 1);
+      const original = await waitForReceipt(payment.id);
+
+      await dataSource.getRepository(Receipt).delete({ id: original.id });
+
+      const res = await request(server)
+        .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      const regenerated = res.body as ReceiptResponseBody;
+
+      expect(regenerated.paymentId).toBe(payment.id);
+      expect(regenerated.amount).toBe(payment.amount);
+      expect(regenerated.status).toBe('issued');
+
+      const listRes = await request(server)
+        .get(`/organizations/${orgAId}/receipts`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      const matching = (listRes.body as ReceiptResponseBody[]).filter(
+        (r) => r.paymentId === payment.id,
+      );
+      expect(matching).toHaveLength(1);
+    });
+
+    it('returns the existing receipt unchanged when one already exists, rather than creating a duplicate', async () => {
+      const { payment } = await createPaidOrderWithReceipt(350, 1);
+      const original = await waitForReceipt(payment.id);
+
+      const res = await request(server)
+        .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      const returned = res.body as ReceiptResponseBody;
+
+      expect(returned.id).toBe(original.id);
+      expect(returned.receiptNumber).toBe(original.receiptNumber);
+
+      const listRes = await request(server)
+        .get(`/organizations/${orgAId}/receipts`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      const matching = (listRes.body as ReceiptResponseBody[]).filter(
+        (r) => r.paymentId === payment.id,
+      );
+      expect(matching).toHaveLength(1);
+    });
+
+    it("forbids reaching Org A's payment through Org B's regenerate call", async () => {
+      const { payment } = await createPaidOrderWithReceipt(250, 1);
+      await waitForReceipt(payment.id);
+
+      await request(server)
+        .post(`/organizations/${orgBId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${orgBOwnerToken}`)
+        .expect(404);
+    });
+
+    it('rejects regenerating a receipt for a payment that never succeeded', async () => {
+      const { payment, invoiceId } = await createPaidOrderWithReceipt(100, 1);
+      await waitForReceipt(payment.id);
+
+      const paymentRows = await dataSource.query<{ created_by: string }[]>(
+        'SELECT created_by FROM payments WHERE id = $1',
+        [payment.id],
+      );
+      const createdBy: string = paymentRows[0].created_by;
+
+      const ineligiblePayment = await dataSource.getRepository(Payment).save(
+        dataSource.getRepository(Payment).create({
+          organizationId: orgAId,
+          invoiceId,
+          idempotencyKey: randomUUID(),
+          amount: 10000,
+          currency: 'NGN',
+          method: PaymentMethod.MANUAL,
+          status: PaymentStatus.FAILED,
+          createdBy,
+        }),
+      );
+
+      await request(server)
+        .post(
+          `/organizations/${orgAId}/receipts/regenerate/${ineligiblePayment.id}`,
+        )
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(400);
+    });
+
+    it('creates exactly one receipt when regenerate is called concurrently for the same payment with no existing receipt', async () => {
+      const { payment } = await createPaidOrderWithReceipt(450, 1);
+      const original = await waitForReceipt(payment.id);
+
+      await dataSource.getRepository(Receipt).delete({ id: original.id });
+
+      const [firstRes, secondRes] = await Promise.all([
+        request(server)
+          .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+          .set('Authorization', `Bearer ${ownerToken}`),
+        request(server)
+          .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+          .set('Authorization', `Bearer ${ownerToken}`),
+      ]);
+
+      expect(firstRes.status).toBe(200);
+      expect(secondRes.status).toBe(200);
+      const first = firstRes.body as ReceiptResponseBody;
+      const second = secondRes.body as ReceiptResponseBody;
+      expect(first.id).toBe(second.id);
+
+      const listRes = await request(server)
+        .get(`/organizations/${orgAId}/receipts`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      const matching = (listRes.body as ReceiptResponseBody[]).filter(
+        (r) => r.paymentId === payment.id,
+      );
+      expect(matching).toHaveLength(1);
+    });
+
+    it('forbids Manager from regenerating a receipt', async () => {
+      const { payment } = await createPaidOrderWithReceipt(200, 1);
+      await waitForReceipt(payment.id);
+
+      await request(server)
+        .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .expect(403);
     });
   });
 });
