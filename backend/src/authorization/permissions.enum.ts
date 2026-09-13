@@ -61,9 +61,11 @@ export enum Permission {
   RECEIPT_SETTINGS_READ = 'receipt_settings:read',
   RECEIPT_SETTINGS_UPDATE = 'receipt_settings:update',
   // Receipts (Sprint 6 CTO Directive §21-22)
+  // Receipts (Sprint 6 CTO Directive §21-22)
   RECEIPT_CREATE = 'receipt:create',
   RECEIPT_READ = 'receipt:read',
   RECEIPT_VOID = 'receipt:void',
+  RECEIPT_REGENERATE = 'receipt:regenerate',
   // Delivery (Sprint 6 CTO Directive §23-28)
   DELIVERY_CREATE = 'delivery:create',
   DELIVERY_READ = 'delivery:read',

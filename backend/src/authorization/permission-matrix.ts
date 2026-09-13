@@ -52,6 +52,7 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.RECEIPT_SETTINGS_UPDATE,
     Permission.RECEIPT_READ,
     Permission.RECEIPT_VOID,
+    Permission.RECEIPT_REGENERATE,
     Permission.DELIVERY_READ,
     Permission.DELIVERY_ASSIGN,
     Permission.DELIVERY_TRANSITION,

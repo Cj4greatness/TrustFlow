@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -62,5 +64,21 @@ export class ReceiptsController {
     @Param('receiptId', ParseUUIDPipe) receiptId: string,
   ) {
     return this.receiptsService.voidReceipt(receiptId, organizationId);
+  }
+
+  @Post('regenerate/:paymentId')
+  @Permissions(Permission.RECEIPT_REGENERATE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Regenerate a missing receipt for a successful payment (idempotent — returns the existing receipt if one already exists)',
+  })
+  @ApiParam({ name: 'id', description: 'Organization UUID' })
+  @ApiParam({ name: 'paymentId', description: 'Payment UUID' })
+  regenerate(
+    @Param('id', ParseUUIDPipe) organizationId: string,
+    @Param('paymentId', ParseUUIDPipe) paymentId: string,
+  ) {
+    return this.receiptsService.regenerateReceipt(paymentId, organizationId);
   }
 }
