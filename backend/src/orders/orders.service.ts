@@ -419,6 +419,35 @@ export class OrdersService {
       if (!lockedOrder) {
         throw new NotFoundException('Order not found');
       }
+
+      // Backend Readiness & Freeze Audit — Orders targeted audit:
+      // the outer assertTransitionAllowed() check above ran against
+      // an UNLOCKED read, taken before this transaction opened. Two
+      // concurrent processOrder() calls can both pass that check
+      // seeing the same pre-race CONFIRMED state, then serialize on
+      // this pessimistic lock. Without this re-check, the loser
+      // would blindly re-attempt the PROCESSING write and Delivery
+      // creation, colliding with Delivery's (organizationId,
+      // orderId) unique constraint and surfacing an unhandled
+      // QueryFailedError as a raw 500 — data integrity was never at
+      // risk (the DB constraint is a real backstop), but the
+      // loser's experience was wrong. Re-validating against the
+      // LOCKED row's actual current status closes that: if another
+      // request already completed this exact transition, return the
+      // current order as an idempotent no-op, matching the same
+      // "return the existing resource" convention already used by
+      // Payment's idempotency-key handling and Receipt's
+      // payment.succeeded listener.
+      if (lockedOrder.status === OrderStatus.PROCESSING) {
+        return lockedOrder;
+      }
+
+      if (!isTransitionAllowed(lockedOrder.status, OrderStatus.PROCESSING)) {
+        throw new BadRequestException(
+          `Cannot transition order from ${lockedOrder.status} to ${OrderStatus.PROCESSING}`,
+        );
+      }
+
       lockedOrder.status = OrderStatus.PROCESSING;
       const savedOrder = await ordersRepo.save(lockedOrder);
 
