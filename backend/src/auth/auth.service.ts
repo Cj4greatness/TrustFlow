@@ -23,6 +23,22 @@ export class AuthService {
     private readonly tokenService: TokenService,
   ) {}
 
+  /**
+   * A valid Argon2 hash with no real matching password, computed once
+   * and cached. Used in login() to pay Argon2's verification cost even
+   * when no user exists for the submitted email, so response time
+   * doesn't reveal which emails have accounts (timing side-channel /
+   * email enumeration).
+   */
+  private dummyPasswordHash: Promise<string> | null = null;
+
+  private getDummyPasswordHash(): Promise<string> {
+    this.dummyPasswordHash ??= this.passwordService.hash(
+      'timing-safety-dummy-password',
+    );
+    return this.dummyPasswordHash;
+  }
+
   async register(dto: RegisterDto): Promise<AuthResponse> {
     const emailTaken = await this.usersRepository.existsByEmail(dto.email);
     if (emailTaken) {
@@ -44,25 +60,45 @@ export class AuthService {
     return this.issueTokensAndBuildResponse(savedUser);
   }
 
+  /**
+   * Authentication contract: TrustFlow permits one active
+   * refresh-token session per user. A successful login from another
+   * device replaces the existing refresh-token session rather than
+   * coexisting with it. The displaced session is invalidated on its
+   * next refresh attempt — see rejectAsRecentlyRotatedOrWipe(), which
+   * returns SESSION_REPLACED_BY_NEW_LOGIN (not a generic failure) so
+   * the displaced client can explain what happened rather than
+   * presenting an unexplained logout.
+   *
+   * Argon2 verification always runs, on both the "user exists" and
+   * "user doesn't exist" paths — against a cached dummy hash in the
+   * latter case — so response time doesn't leak whether a submitted
+   * email has an account (timing side-channel / email enumeration).
+   */
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersRepository.findAuthUserByEmail(dto.email);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
     const passwordMatches = await this.passwordService.verify(
-      user.passwordHash,
+      user?.passwordHash ?? (await this.getDummyPasswordHash()),
       dto.password,
     );
 
-    if (!passwordMatches) {
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
     await this.usersRepository.updateLastLogin(user.id);
 
-    return this.issueTokensAndBuildResponse(user);
+    const tokens = this.tokenService.generateTokenPair(user);
+    const refreshTokenHash = await this.passwordService.hash(
+      tokens.refreshToken,
+    );
+    await this.usersRepository.replaceRefreshTokenHashOnLogin(
+      user.id,
+      refreshTokenHash,
+    );
+
+    return this.buildAuthResponse(user, tokens);
   }
 
   /**
@@ -129,18 +165,38 @@ export class AuthService {
 
   /**
    * Called when a presented refresh token didn't win (or didn't
-   * match) the current hash. Distinguishes a benign concurrent-
-   * rotation race from genuine token reuse:
-   *  - matches previousRefreshTokenHash AND within the grace window
-   *    -> non-destructive 401, session left intact
-   *  - otherwise -> treated as theft, session wiped (unchanged
-   *    behavior from before this fix)
+   * match) the current hash. Checks three possibilities, most
+   * specific first:
+   *  - matches displacedRefreshTokenHash -> this device's session
+   *    was replaced by a login elsewhere. Non-destructive 401 with
+   *    SESSION_REPLACED_BY_NEW_LOGIN. Crucially, refreshTokenHash is
+   *    NOT touched here — the new session that displaced this one
+   *    must keep working.
+   *  - matches previousRefreshTokenHash AND within the 10s grace
+   *    window -> benign concurrent-rotation race. Non-destructive
+   *    401 with REFRESH_TOKEN_RECENTLY_ROTATED, session left intact.
+   *  - otherwise -> genuine reuse/theft, session wiped (unchanged
+   *    behavior from before this fix).
    */
   private async rejectAsRecentlyRotatedOrWipe(
     userId: string,
     presentedToken: string,
   ): Promise<never> {
     const user = await this.usersRepository.findById(userId);
+
+    const matchesDisplaced =
+      !!user?.displacedRefreshTokenHash &&
+      (await this.passwordService.verify(
+        user.displacedRefreshTokenHash,
+        presentedToken,
+      ));
+
+    if (matchesDisplaced) {
+      throw new UnauthorizedException({
+        message: 'This session was replaced by a login on another device',
+        code: 'SESSION_REPLACED_BY_NEW_LOGIN',
+      });
+    }
 
     const withinWindow =
       !!user?.refreshTokenRotatedAt &&
@@ -172,12 +228,13 @@ export class AuthService {
   /**
    * Issues a fresh access/refresh token pair, persists the hashed
    * refresh token against the user (for future rotation/revocation
-   * checks), and shapes the public response. Used by
-   * register/login, where there's no prior token to race against so
-   * an unconditional write is correct. refresh() does NOT call this
-   * — its winning rotation is already persisted via the CAS in
-   * rotateRefreshTokenHash(), so it calls buildAuthResponse()
-   * directly to avoid writing the hash a second time.
+   * checks), and shapes the public response. Used by register, where
+   * there's no prior session to displace so an unconditional write
+   * is correct. login() does NOT call this — it goes through
+   * replaceRefreshTokenHashOnLogin() instead, to capture the
+   * outgoing hash as displacedRefreshTokenHash. refresh() also does
+   * NOT call this — its winning rotation is already persisted via
+   * the CAS in rotateRefreshTokenHash().
    */
   private async issueTokensAndBuildResponse(user: User): Promise<AuthResponse> {
     const tokens = this.tokenService.generateTokenPair(user);
@@ -195,8 +252,7 @@ export class AuthService {
   /**
    * Shapes the public AuthResponse from a user and an already-issued
    * token pair. Persisting the token hash is the caller's
-   * responsibility (see issueTokensAndBuildResponse vs. refresh's
-   * own CAS) — this method only builds the response shape.
+   * responsibility — this method only builds the response shape.
    */
   private buildAuthResponse(
     user: User,

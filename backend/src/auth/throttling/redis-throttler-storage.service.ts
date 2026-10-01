@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ThrottlerStorage, ThrottlerStorageRecord } from '@nestjs/throttler';
+import { ThrottlerStorage } from '@nestjs/throttler';
+import { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface';
 import { RedisService } from '../../redis/redis.service';
 
 const INCREMENT_SCRIPT = `
