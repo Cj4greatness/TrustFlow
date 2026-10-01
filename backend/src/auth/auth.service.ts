@@ -23,6 +23,22 @@ export class AuthService {
     private readonly tokenService: TokenService,
   ) {}
 
+  /**
+   * A valid Argon2 hash with no real matching password, computed once
+   * and cached. Used in login() to pay Argon2's verification cost even
+   * when no user exists for the submitted email, so response time
+   * doesn't reveal which emails have accounts (timing side-channel /
+   * email enumeration).
+   */
+  private dummyPasswordHash: Promise<string> | null = null;
+
+  private getDummyPasswordHash(): Promise<string> {
+    this.dummyPasswordHash ??= this.passwordService.hash(
+      'timing-safety-dummy-password',
+    );
+    return this.dummyPasswordHash;
+  }
+
   async register(dto: RegisterDto): Promise<AuthResponse> {
     const emailTaken = await this.usersRepository.existsByEmail(dto.email);
     if (emailTaken) {
@@ -44,19 +60,24 @@ export class AuthService {
     return this.issueTokensAndBuildResponse(savedUser);
   }
 
+  /**
+   * Argon2 verification always runs, on both the "user exists" and
+   * "user doesn't exist" paths — against a cached dummy hash in the
+   * latter case — so response time doesn't leak whether a submitted
+   * email has an account. Without this, the no-such-user path returns
+   * after a cheap DB lookup while the wrong-password path additionally
+   * pays Argon2's (deliberately slow) cost, letting an attacker
+   * measure timing to enumerate valid emails.
+   */
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersRepository.findAuthUserByEmail(dto.email);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
     const passwordMatches = await this.passwordService.verify(
-      user.passwordHash,
+      user?.passwordHash ?? (await this.getDummyPasswordHash()),
       dto.password,
     );
 
-    if (!passwordMatches) {
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
