@@ -72,4 +72,27 @@ export class User extends BaseEntity {
     name: 'refresh_token_hash',
   })
   refreshTokenHash: string | null;
+
+  /**
+   * Hash of the refresh token that was valid immediately before the
+   * most recent rotation, paired with refreshTokenRotatedAt. Lets a
+   * concurrent refresh() call that lost the compare-and-swap race be
+   * told "already rotated" instead of having its session wiped as
+   * theft. Cleared on logout and fresh login/register.
+   */
+  @Exclude({ toPlainOnly: true })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'previous_refresh_token_hash',
+  })
+  previousRefreshTokenHash: string | null;
+
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    name: 'refresh_token_rotated_at',
+  })
+  refreshTokenRotatedAt: Date | null;
 }
