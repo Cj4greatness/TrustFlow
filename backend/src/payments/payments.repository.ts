@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, FindOptionsWhere, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Payment } from './entities/payment.entity';
 
@@ -26,14 +26,34 @@ export class PaymentsRepository {
    * Throws NotFoundException (not ForbiddenException) if the payment
    * doesn't exist OR belongs to a different organization — same
    * information-leak-avoidance reasoning as InvoicesRepository.
+   *
+   * CTO-directed tightening (Backend Readiness & Freeze Audit,
+   * Section 2, follow-up #3): invoiceId is now an OPTIONAL third
+   * filter, not a required one. The HTTP controller
+   * (GET .../invoices/:invoiceId/payments/:paymentId) passes it,
+   * closing the original gap where a client could fetch a payment
+   * belonging to a DIFFERENT invoice in the same org via a URL that
+   * implied it belonged to the one in the path.
+   *
+   * It stays optional because get_payment (the AI Tool Registry
+   * entry) has a legitimate, by-design use case: fetching a payment
+   * by ID alone, with no invoice context available or needed — see
+   * get-payment.tool.ts's own doc comment. Making invoiceId
+   * mandatory here would break that caller's contract, which is
+   * outside what this audit follow-up asked for.
    */
   async getOwnedPaymentOrThrow(
     id: string,
     organizationId: string,
+    invoiceId?: string,
     manager?: EntityManager,
   ): Promise<Payment> {
     const repo = manager ? manager.getRepository(Payment) : this.repo;
-    const payment = await repo.findOne({ where: { id, organizationId } });
+    const where: FindOptionsWhere<Payment> = { id, organizationId };
+    if (invoiceId !== undefined) {
+      where.invoiceId = invoiceId;
+    }
+    const payment = await repo.findOne({ where });
     if (!payment) {
       throw new NotFoundException(`Payment ${id} not found`);
     }

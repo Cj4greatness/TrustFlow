@@ -61,12 +61,52 @@ export class UsersRepository {
    * Persists the hash of the user's current valid refresh token, or
    * clears it (null) on logout/revocation. Called after every
    * successful login/register/refresh, and on logout.
+   *
+   * Also clears previousRefreshTokenHash/refreshTokenRotatedAt, so a
+   * logged-out or freshly-logged-in session can't still be recognized
+   * as "recently rotated" by a stale token from the old session.
    */
   async updateRefreshTokenHash(
     id: string,
     refreshTokenHash: string | null,
   ): Promise<void> {
-    await this.repository.update({ id }, { refreshTokenHash });
+    await this.repository.update(
+      { id },
+      {
+        refreshTokenHash,
+        previousRefreshTokenHash: null,
+        refreshTokenRotatedAt: null,
+      },
+    );
+  }
+
+  /**
+   * Compare-and-swap rotation for refresh token reuse detection.
+   * The UPDATE only matches a row whose refreshTokenHash is still
+   * the hash we verified against — if a concurrent refresh() call
+   * already rotated it first, zero rows match and this returns
+   * false, telling the caller to discard the tokens it generated
+   * rather than returning them.
+   *
+   * On success, the old hash is preserved as previousRefreshTokenHash
+   * with a timestamp, so a losing concurrent caller can be told
+   * "already rotated" instead of having its session wiped as theft.
+   */
+  async rotateRefreshTokenHash(
+    id: string,
+    verifiedHash: string,
+    newHash: string,
+  ): Promise<boolean> {
+    const result = await this.repository.update(
+      { id, refreshTokenHash: verifiedHash },
+      {
+        refreshTokenHash: newHash,
+        previousRefreshTokenHash: verifiedHash,
+        refreshTokenRotatedAt: new Date(),
+      },
+    );
+
+    return (result.affected ?? 0) === 1;
   }
 
   /**

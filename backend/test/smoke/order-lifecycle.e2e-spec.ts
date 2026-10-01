@@ -11,6 +11,7 @@ import { OrganizationsService } from '../../src/organizations/organizations.serv
 import { PasswordService } from '../../src/security/password.service';
 import { OrderStatus } from '../../src/orders/entities/order.entity';
 import { InventoryMovementType } from '../../src/products/entities/inventory-movement.entity';
+import { DeliveriesService } from '../../src/deliveries/deliveries.service';
 
 /**
  * Orders — Lifecycle, Inventory Interaction & Transaction Integrity (e2e)
@@ -25,6 +26,13 @@ import { InventoryMovementType } from '../../src/products/entities/inventory-mov
  * nothing about whether the transaction boundaries are correct;
  * only running real inventory-insufficient and rollback scenarios
  * against a real Postgres instance can prove that.
+ *
+ * CONCURRENCY TESTS (added — Backend Readiness & Freeze Audit,
+ * Orders targeted audit): directly verify the invariant the CTO's
+ * audit asked for — that concurrent processOrder() calls on the same
+ * Order can produce at most one Delivery — by calling
+ * deliveriesService.listDeliveries() and counting, rather than
+ * inferring it indirectly from the absence of an error.
  */
 describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
   let app: INestApplication;
@@ -32,6 +40,7 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
   let customersService: CustomersService;
   let productsService: ProductsService;
   let inventoryService: InventoryService;
+  let deliveriesService: DeliveriesService;
   let orgId: string;
   let userId: string;
   let customerId: string;
@@ -52,6 +61,7 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
     customersService = app.get(CustomersService);
     productsService = app.get(ProductsService);
     inventoryService = app.get(InventoryService);
+    deliveriesService = app.get(DeliveriesService);
     const usersService = app.get(UsersService);
     const organizationsService = app.get(OrganizationsService);
     const passwordService = app.get(PasswordService);
@@ -379,4 +389,93 @@ describe('Orders — Lifecycle & Inventory Integrity (e2e)', () => {
       ordersService.cancelOrder(orgId, order.id, userId),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it(
+    'creates exactly ONE Delivery when processOrder is called ' +
+      'concurrently for the same order — Backend Readiness & Freeze ' +
+      'Audit, Orders targeted audit: proves the core invariant the ' +
+      "CTO's audit asked for directly, not just via Delivery's " +
+      'unique-constraint side effect',
+    async () => {
+      const product = await productsService.createProduct(
+        orgId,
+        { name: 'Concurrent Process Product', sku: sku(), sellingPrice: 100 },
+        userId,
+      );
+      await inventoryService.adjustInventory(
+        orgId,
+        product.id,
+        { type: InventoryMovementType.ADD, quantity: 10, reason: 'Seed stock' },
+        userId,
+      );
+
+      const order = await ordersService.createOrder(
+        orgId,
+        { customerId, shippingAddressId },
+        userId,
+      );
+      await ordersService.addOrderItem(orgId, order.id, {
+        productId: product.id,
+        quantity: 1,
+      });
+      await ordersService.confirmOrder(orgId, order.id, userId);
+
+      const [first, second] = await Promise.all([
+        ordersService.processOrder(orgId, order.id),
+        ordersService.processOrder(orgId, order.id),
+      ]);
+
+      // Both calls succeed — the loser gets the same PROCESSING
+      // order back as an idempotent no-op, not an error, per the
+      // fix's design (matching Payment/Receipt's idempotency
+      // convention elsewhere in the codebase).
+      expect(first.status).toBe(OrderStatus.PROCESSING);
+      expect(second.status).toBe(OrderStatus.PROCESSING);
+
+      const deliveries = await deliveriesService.listDeliveries(orgId);
+      const matching = deliveries.filter((d) => d.orderId === order.id);
+      expect(matching).toHaveLength(1);
+    },
+  );
+
+  it(
+    'rejects a sequential replay of processOrder after the order is ' +
+      'already PROCESSING — distinct from the concurrent case above: ' +
+      'this call starts AFTER the prior transition has already ' +
+      'committed, so the outer (unlocked) guard catches it before a ' +
+      'transaction ever opens',
+    async () => {
+      const product = await productsService.createProduct(
+        orgId,
+        { name: 'Sequential Replay Product', sku: sku(), sellingPrice: 100 },
+        userId,
+      );
+      await inventoryService.adjustInventory(
+        orgId,
+        product.id,
+        { type: InventoryMovementType.ADD, quantity: 10, reason: 'Seed stock' },
+        userId,
+      );
+
+      const order = await ordersService.createOrder(
+        orgId,
+        { customerId, shippingAddressId },
+        userId,
+      );
+      await ordersService.addOrderItem(orgId, order.id, {
+        productId: product.id,
+        quantity: 1,
+      });
+      await ordersService.confirmOrder(orgId, order.id, userId);
+      await ordersService.processOrder(orgId, order.id);
+
+      await expect(ordersService.processOrder(orgId, order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      const deliveries = await deliveriesService.listDeliveries(orgId);
+      const matching = deliveries.filter((d) => d.orderId === order.id);
+      expect(matching).toHaveLength(1);
+    },
+  );
 });

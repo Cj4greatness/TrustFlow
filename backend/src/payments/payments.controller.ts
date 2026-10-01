@@ -94,8 +94,13 @@ export class PaymentsController {
   @ApiParam({ name: 'paymentId', description: 'Payment UUID' })
   findOne(
     @Param('id', ParseUUIDPipe) organizationId: string,
+    @Param('invoiceId', ParseUUIDPipe) invoiceId: string,
     @Param('paymentId', ParseUUIDPipe) paymentId: string,
   ) {
-    return this.paymentsService.getPayment(paymentId, organizationId);
+    return this.paymentsService.getPayment(
+      paymentId,
+      organizationId,
+      invoiceId,
+    );
   }
 }

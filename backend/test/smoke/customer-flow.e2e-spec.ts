@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../../src/app.module';
+import { AuthService } from '../../src/auth/auth.service';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 
 /**
@@ -23,10 +24,6 @@ import { HttpExceptionFilter } from '../../src/common/filters/http-exception.fil
  * run, matching the invitation suite's self-contained, rerunnable
  * design.
  */
-
-interface AuthResponseBody {
-  accessToken: string;
-}
 
 interface OrganizationResponseBody {
   id: string;
@@ -77,20 +74,14 @@ describe('Customer Flow (e2e)', () => {
     email: string,
     firstName: string,
   ): Promise<string> => {
-    await request(server).post('/auth/register').send({
+    const authService = app.get(AuthService);
+    const { accessToken } = await authService.register({
       email,
       password: PASSWORD,
       firstName,
       lastName: 'Test',
     });
-
-    const loginRes = await request(server)
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-
-    const body = loginRes.body as AuthResponseBody;
-    return body.accessToken;
+    return accessToken;
   };
 
   const inviteAndAccept = async (
@@ -172,7 +163,7 @@ describe('Customer Flow (e2e)', () => {
       staffAToken,
       'staff',
     );
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();

@@ -26,6 +26,10 @@ export class InventoryRepository {
     return this.repository.findOne({ where: { productId } });
   }
 
+  findByOrganization(organizationId: string): Promise<Inventory[]> {
+    return this.repository.find({ where: { organizationId } });
+  }
+
   /**
    * Same operations as above, but bound to a transactional
    * EntityManager. Used by ProductsService.createProduct() (atomic

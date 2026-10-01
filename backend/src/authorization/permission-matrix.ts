@@ -21,11 +21,8 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.OWNERSHIP_TRANSFER,
     Permission.INVOICE_CREATE,
     Permission.INVOICE_APPROVE,
-    // DEFAULT APPLIED, NOT CTO-CONFIRMED (was flagged in the Sprint 5
-    // review as unassigned everywhere including Owner; surfaced again
-    // as an actual test-blocking bug while writing Receipts e2e
-    // tests during Sprint 6). Confirm with CTO and replace this
-    // comment once ratified — do not treat as final.
+    // CTO-RATIFIED (RBAC Ratification Decision Record): INVOICE_READ
+    // is universal across all five roles.
     Permission.INVOICE_READ,
     Permission.INVOICE_UPDATE,
     Permission.INVOICE_ISSUE,
@@ -55,11 +52,24 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.RECEIPT_SETTINGS_UPDATE,
     Permission.RECEIPT_READ,
     Permission.RECEIPT_VOID,
+    Permission.RECEIPT_REGENERATE,
     Permission.DELIVERY_READ,
     Permission.DELIVERY_ASSIGN,
     Permission.DELIVERY_TRANSITION,
     Permission.DELIVERY_CANCEL,
+    // SUPPLIER_READ remains Owner-only — this predates and is
+    // separate from the RBAC Ratification Decision Record, which
+    // explicitly excluded it (still the S7-01 stopgap; revisit only
+    // if that decision is separately reopened).
+    Permission.SUPPLIER_READ,
+    // CTO-RATIFIED: Supplier mutation matrix, modeled on Product's
+    // Owner/Admin/Manager shape.
+    Permission.SUPPLIER_CREATE,
+    Permission.SUPPLIER_UPDATE,
+    Permission.SUPPLIER_DELETE,
+    Permission.SUPPLIER_PRODUCT_MANAGE,
   ],
+
   [OrganizationRole.ADMIN]: [
     Permission.ORGANIZATION_UPDATE,
     Permission.ORGANIZATION_VIEW,
@@ -72,8 +82,7 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // ownership."
     Permission.INVOICE_CREATE,
     Permission.INVOICE_APPROVE,
-    // DEFAULT APPLIED, NOT CTO-CONFIRMED — see OWNER block above for
-    // full reasoning.
+    // CTO-RATIFIED: INVOICE_READ is universal across all five roles.
     Permission.INVOICE_READ,
     Permission.INVOICE_UPDATE,
     Permission.INVOICE_ISSUE,
@@ -107,15 +116,22 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.DELIVERY_ASSIGN,
     Permission.DELIVERY_TRANSITION,
     Permission.DELIVERY_CANCEL,
+    // CTO-RATIFIED: Supplier mutation matrix. Note SUPPLIER_READ is
+    // NOT included here — Admin has never had it (Owner-only S7-01
+    // stopgap, untouched by this ratification).
+    Permission.SUPPLIER_CREATE,
+    Permission.SUPPLIER_UPDATE,
+    Permission.SUPPLIER_DELETE,
+    Permission.SUPPLIER_PRODUCT_MANAGE,
   ],
   [OrganizationRole.MANAGER]: [
     Permission.ORGANIZATION_VIEW,
     Permission.MEMBER_VIEW,
-    // Deliberately no MEMBER_REMOVE — per CTO acceptance criteria,
-    // "Manager cannot remove owner" (and, more generally, Manager
-    // has no member-removal rights at all in this matrix).
+    // CTO-RATIFIED (RBAC Ratification Decision Record): Manager does
+    // not receive MEMBER_INVITE or MEMBER_UPDATE — member governance
+    // stays Owner/Admin-only, consistent with MEMBER_REMOVE.
     Permission.INVOICE_CREATE,
-    // DEFAULT APPLIED, NOT CTO-CONFIRMED — see OWNER block above.
+    // CTO-RATIFIED: INVOICE_READ is universal across all five roles.
     Permission.INVOICE_READ,
     Permission.INVOICE_UPDATE,
     Permission.PAYMENT_CREATE,
@@ -123,11 +139,9 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.INVENTORY_UPDATE,
     Permission.CUSTOMER_CREATE,
     Permission.CUSTOMER_READ,
-    // FLAGGED FOR CTO REVIEW: no CUSTOMER_UPDATE for Manager or Staff
-    // (see STAFF block below). Unlike CUSTOMER_DELETE, this wasn't a
-    // deliberate exclusion from the CTO's acceptance criteria — it's
-    // simply absent. Confirm before Product & Inventory's matrix is
-    // built against the same pattern.
+    // CTO-RATIFIED: CUSTOMER_UPDATE granted to Manager, matching the
+    // create+update-no-delete shape already used for Product/Order.
+    Permission.CUSTOMER_UPDATE,
     // Deliberately no CUSTOMER_DELETE — per the locked Customer
     // permission matrix, only Owner/Admin can delete customers.
     Permission.CUSTOMER_NOTE_CREATE,
@@ -156,6 +170,13 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.DELIVERY_TRANSITION,
     // Deliberately no DELIVERY_CANCEL — Owner/Admin only, matching
     // INVOICE_APPROVE / RECEIPT_VOID's pattern.
+    // CTO-RATIFIED: Supplier mutation matrix, modeled on Product's
+    // Owner/Admin/Manager shape. No SUPPLIER_DELETE (Owner/Admin
+    // only, matching Product/Customer's delete restriction) and no
+    // SUPPLIER_READ (unchanged S7-01 stopgap, Owner-only).
+    Permission.SUPPLIER_CREATE,
+    Permission.SUPPLIER_UPDATE,
+    Permission.SUPPLIER_PRODUCT_MANAGE,
   ],
   [OrganizationRole.STAFF]: [
     Permission.ORGANIZATION_VIEW,
@@ -163,12 +184,13 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // Deliberately no MEMBER_INVITE — per CTO acceptance criteria,
     // "Staff cannot invite users."
     Permission.INVOICE_CREATE,
-    // DEFAULT APPLIED, NOT CTO-CONFIRMED — see OWNER block above.
+    // CTO-RATIFIED: INVOICE_READ is universal across all five roles.
     Permission.INVOICE_READ,
     Permission.PAYMENT_READ,
     Permission.CUSTOMER_CREATE,
     Permission.CUSTOMER_READ,
-    // See the flagged note in MANAGER above — same gap applies here.
+    // CTO-RATIFIED: Staff does NOT receive CUSTOMER_UPDATE — kept
+    // excluded per the ratification decision (Manager+ only).
     // Deliberately no CUSTOMER_DELETE — same reasoning as Manager.
     Permission.CUSTOMER_NOTE_CREATE,
     Permission.CUSTOMER_NOTE_READ,
@@ -176,8 +198,13 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     // No PRODUCT_CREATE/UPDATE/DELETE for Staff — product
     // definition/pricing is treated as a Manager+ responsibility.
     Permission.INVENTORY_READ,
-    // FLAGGED FOR CTO REVIEW: INVENTORY_ADJUST for Staff — see
-    // history in prior commits, still unresolved.
+    // CTO-RATIFIED: INVENTORY_ADJUST granted to Staff — Staff already
+    // performs ORDER_PROCESS, the operational step inventory
+    // adjustment supports. Enforcement of inventory invariants
+    // (append-only movement validation) remains in the domain
+    // service — this permission authorizes the call, it does not
+    // bypass stock/movement validation.
+    Permission.INVENTORY_ADJUST,
     Permission.ORDER_CREATE,
     Permission.ORDER_READ,
     Permission.ORDER_PROCESS,
@@ -188,6 +215,10 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.DELIVERY_READ,
     // Deliberately no DELIVERY_ASSIGN/TRANSITION/CANCEL — Staff
     // excluded from all Delivery mutations (ratified this session).
+    // No Supplier mutation permissions for Staff — read-only tier
+    // per the ratified Supplier matrix (and SUPPLIER_READ itself
+    // remains Owner-only per the unchanged S7-01 stopgap, so Staff
+    // currently has no supplier access at all).
   ],
   [OrganizationRole.VIEWER]: [
     Permission.ORGANIZATION_VIEW,
@@ -204,5 +235,7 @@ export const PERMISSION_MATRIX: Record<OrganizationRole, Permission[]> = {
     Permission.RECEIPT_SETTINGS_READ,
     Permission.RECEIPT_READ,
     Permission.DELIVERY_READ,
+    // No Supplier permissions — SUPPLIER_READ remains Owner-only per
+    // the unchanged S7-01 stopgap.
   ],
 };

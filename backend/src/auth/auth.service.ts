@@ -13,6 +13,8 @@ import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthResponse } from './types/auth-response.type';
 import { JwtPayload } from './types/jwt-payload.type';
 
+const RECENTLY_ROTATED_WINDOW_MS = 10_000;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -63,6 +65,22 @@ export class AuthService {
     return this.issueTokensAndBuildResponse(user);
   }
 
+  /**
+   * Rotates a refresh token via compare-and-swap rather than a plain
+   * read-verify-write, to close a concurrency gap: two simultaneous
+   * refresh() calls with the same valid token used to both pass
+   * verification and both rotate, and whichever response the client
+   * discarded as "stale" would fail on its next use — silently
+   * logging the user out with no actual token theft involved.
+   *
+   * Now only one concurrent caller can win the rotation. A caller
+   * that loses the race (or arrives just after another request
+   * already rotated) is told REFRESH_TOKEN_RECENTLY_ROTATED via a
+   * non-destructive 401 instead of having its session wiped — see
+   * rejectAsRecentlyRotatedOrWipe(). Genuine reuse of a stale token
+   * outside that grace window still wipes the session, unchanged
+   * from before.
+   */
   async refresh(refreshToken: string): Promise<AuthResponse> {
     let payload: JwtPayload;
     try {
@@ -82,14 +100,27 @@ export class AuthService {
     );
 
     if (!tokenMatches) {
-      // Possible token reuse/theft — invalidate the stored token so
-      // the compromised refresh token can't be used again, even if
-      // presented correctly a second time.
-      await this.usersRepository.updateRefreshTokenHash(user.id, null);
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      return this.rejectAsRecentlyRotatedOrWipe(user.id, refreshToken);
     }
 
-    return this.issueTokensAndBuildResponse(user);
+    // Build the replacement pair before attempting the swap. If we
+    // lose the race, these are discarded — never returned to the caller.
+    const tokens = this.tokenService.generateTokenPair(user);
+    const newRefreshTokenHash = await this.passwordService.hash(
+      tokens.refreshToken,
+    );
+
+    const won = await this.usersRepository.rotateRefreshTokenHash(
+      user.id,
+      user.refreshTokenHash,
+      newRefreshTokenHash,
+    );
+
+    if (!won) {
+      return this.rejectAsRecentlyRotatedOrWipe(user.id, refreshToken);
+    }
+
+    return this.buildAuthResponse(user, tokens);
   }
 
   async logout(userId: string): Promise<void> {
@@ -97,16 +128,56 @@ export class AuthService {
   }
 
   /**
+   * Called when a presented refresh token didn't win (or didn't
+   * match) the current hash. Distinguishes a benign concurrent-
+   * rotation race from genuine token reuse:
+   *  - matches previousRefreshTokenHash AND within the grace window
+   *    -> non-destructive 401, session left intact
+   *  - otherwise -> treated as theft, session wiped (unchanged
+   *    behavior from before this fix)
+   */
+  private async rejectAsRecentlyRotatedOrWipe(
+    userId: string,
+    presentedToken: string,
+  ): Promise<never> {
+    const user = await this.usersRepository.findById(userId);
+
+    const withinWindow =
+      !!user?.refreshTokenRotatedAt &&
+      Date.now() - user.refreshTokenRotatedAt.getTime() <=
+        RECENTLY_ROTATED_WINDOW_MS;
+
+    const matchesPrevious =
+      withinWindow &&
+      !!user?.previousRefreshTokenHash &&
+      (await this.passwordService.verify(
+        user.previousRefreshTokenHash,
+        presentedToken,
+      ));
+
+    if (matchesPrevious) {
+      throw new UnauthorizedException({
+        message: 'Refresh token was already rotated by a concurrent request',
+        code: 'REFRESH_TOKEN_RECENTLY_ROTATED',
+      });
+    }
+
+    // Genuine reuse/theft — invalidate the stored token so the
+    // compromised refresh token can't be used again, even if
+    // presented correctly a second time.
+    await this.usersRepository.updateRefreshTokenHash(userId, null);
+    throw new UnauthorizedException('Invalid or expired refresh token');
+  }
+
+  /**
    * Issues a fresh access/refresh token pair, persists the hashed
    * refresh token against the user (for future rotation/revocation
-   * checks), and shapes the public response. Shared by
-   * register/login/refresh so token issuance behaves identically
-   * everywhere.
-   *
-   * The refresh token itself is hashed with the same PasswordService
-   * used for user passwords before storage — never stored in plain
-   * text, so a database read alone can't be used to impersonate a
-   * user via their refresh token.
+   * checks), and shapes the public response. Used by
+   * register/login, where there's no prior token to race against so
+   * an unconditional write is correct. refresh() does NOT call this
+   * — its winning rotation is already persisted via the CAS in
+   * rotateRefreshTokenHash(), so it calls buildAuthResponse()
+   * directly to avoid writing the hash a second time.
    */
   private async issueTokensAndBuildResponse(user: User): Promise<AuthResponse> {
     const tokens = this.tokenService.generateTokenPair(user);
@@ -118,6 +189,19 @@ export class AuthService {
       refreshTokenHash,
     );
 
+    return this.buildAuthResponse(user, tokens);
+  }
+
+  /**
+   * Shapes the public AuthResponse from a user and an already-issued
+   * token pair. Persisting the token hash is the caller's
+   * responsibility (see issueTokensAndBuildResponse vs. refresh's
+   * own CAS) — this method only builds the response shape.
+   */
+  private buildAuthResponse(
+    user: User,
+    tokens: { accessToken: string; refreshToken: string },
+  ): AuthResponse {
     const userResponse = new UserResponseDto({
       id: user.id,
       firstName: user.firstName,

@@ -18,8 +18,23 @@ import { CustomersModule } from '../customers/customers.module';
 import { CustomersService } from '../customers/customers.service';
 import { OrdersModule } from '../orders/orders.module';
 import { OrdersService } from '../orders/orders.service';
+import { InvoicesModule } from '../invoices/invoices.module';
+import { InvoicesService } from '../invoices/invoices.service';
+import { SuppliersModule } from '../suppliers/suppliers.module';
+import { SuppliersService } from '../suppliers/suppliers.service';
+import { DeliveriesModule } from '../deliveries/deliveries.module';
+import { DeliveriesService } from '../deliveries/deliveries.service';
+import { ProductsModule } from '../products/products.module';
+import { ProductsService } from '../products/products.service';
+import { PaymentsModule } from '../payments/payments.module';
+import { PaymentsService } from '../payments/payments.service';
 import { createGetCustomerTool } from './tools/get-customer.tool';
 import { createGetOrderTool } from './tools/get-order.tool';
+import { createGetInvoiceTool } from './tools/get-invoice.tool';
+import { createGetSupplierTool } from './tools/get-supplier.tool';
+import { createGetDeliveryTool } from './tools/get-delivery.tool';
+import { createGetProductTool } from './tools/get-product.tool';
+import { createGetPaymentTool } from './tools/get-payment.tool';
 import { AppConfig } from '../config/configuration';
 
 /**
@@ -48,6 +63,11 @@ import { AppConfig } from '../config/configuration';
     forwardRef(() => OrganizationMembersModule),
     forwardRef(() => CustomersModule),
     forwardRef(() => OrdersModule),
+    forwardRef(() => InvoicesModule),
+    forwardRef(() => SuppliersModule),
+    forwardRef(() => DeliveriesModule),
+    forwardRef(() => ProductsModule),
+    forwardRef(() => PaymentsModule),
   ],
   providers: [
     AiUsageService,
@@ -85,10 +105,20 @@ export class AiModule implements OnModuleInit {
     private readonly aiToolRegistry: AiToolRegistry,
     private readonly customersService: CustomersService,
     private readonly ordersService: OrdersService,
+    private readonly invoicesService: InvoicesService,
+    private readonly suppliersService: SuppliersService,
+    private readonly deliveriesService: DeliveriesService,
+    private readonly productsService: ProductsService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   onModuleInit(): void {
     this.aiToolRegistry.register(createGetCustomerTool(this.customersService));
     this.aiToolRegistry.register(createGetOrderTool(this.ordersService));
+    this.aiToolRegistry.register(createGetInvoiceTool(this.invoicesService));
+    this.aiToolRegistry.register(createGetSupplierTool(this.suppliersService));
+    this.aiToolRegistry.register(createGetDeliveryTool(this.deliveriesService));
+    this.aiToolRegistry.register(createGetProductTool(this.productsService));
+    this.aiToolRegistry.register(createGetPaymentTool(this.paymentsService));
   }
 }

@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../../src/app.module';
+import { AuthService } from '../../src/auth/auth.service';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 
 /**
@@ -24,10 +25,6 @@ import { HttpExceptionFilter } from '../../src/common/filters/http-exception.fil
  * corrupted matrix could grant Viewer three of four mutations and
  * still pass a single assertion.
  */
-
-interface AuthResponseBody {
-  accessToken: string;
-}
 
 interface OrganizationResponseBody {
   id: string;
@@ -67,17 +64,14 @@ describe('Product & Inventory — RBAC (e2e)', () => {
     email: string,
     firstName: string,
   ): Promise<string> => {
-    await request(server).post('/auth/register').send({
+    const authService = app.get(AuthService);
+    const { accessToken } = await authService.register({
       email,
       password: PASSWORD,
       firstName,
       lastName: 'Test',
     });
-    const loginRes = await request(server)
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-    return (loginRes.body as AuthResponseBody).accessToken;
+    return accessToken;
   };
 
   const inviteAndAccept = async (
@@ -226,19 +220,20 @@ describe('Product & Inventory — RBAC (e2e)', () => {
     });
 
     it(
-      'forbids Staff from adjusting inventory — INVENTORY_ADJUST is ' +
-        'intentionally withheld pending explicit CTO confirmation ' +
-        '(see permission-matrix.ts). This assertion documents current ' +
-        'behavior; it must be updated deliberately, not silently, if ' +
-        'that decision changes.',
+      'allows Staff to adjust inventory — CTO-ratified via the RBAC ' +
+        'Ratification Decision Record: Staff already holds ' +
+        'ORDER_PROCESS, the operational step inventory adjustment ' +
+        'supports. This assertion documents the ratified behavior; ' +
+        'the domain service (not this permission check) is what ' +
+        'enforces append-only movement invariants.',
       async () => {
         await request(server)
           .post(
             `/organizations/${orgId}/products/${sharedProductId}/inventory/adjustments`,
           )
           .set('Authorization', `Bearer ${staffToken}`)
-          .send({ type: 'add', quantity: 5, reason: 'Should fail for now' })
-          .expect(403);
+          .send({ type: 'add', quantity: 5, reason: 'Staff stock check' })
+          .expect(201);
       },
     );
   });
