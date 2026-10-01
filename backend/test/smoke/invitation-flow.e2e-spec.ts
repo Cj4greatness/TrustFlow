@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../../src/app.module';
+import { AuthService } from '../../src/auth/auth.service';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 
 /**
@@ -23,10 +24,6 @@ import { HttpExceptionFilter } from '../../src/common/filters/http-exception.fil
  * run, so this suite is self-contained and safely rerunnable without
  * manual seeding or DB cleanup between runs.
  */
-
-interface AuthResponseBody {
-  accessToken: string;
-}
 
 interface OrganizationResponseBody {
   id: string;
@@ -72,20 +69,14 @@ describe('Invitation Lifecycle (e2e)', () => {
     email: string,
     firstName: string,
   ): Promise<string> => {
-    await request(server).post('/auth/register').send({
+    const authService = app.get(AuthService);
+    const { accessToken } = await authService.register({
       email,
       password: PASSWORD,
       firstName,
       lastName: 'Test',
     });
-
-    const loginRes = await request(server)
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-
-    const body = loginRes.body as AuthResponseBody;
-    return body.accessToken;
+    return accessToken;
   };
 
   beforeAll(async () => {
@@ -306,6 +297,62 @@ describe('Invitation Lifecycle (e2e)', () => {
     // would mean anyone can cancel anyone else's pending invitation.
     expect(res.status).toBe(403);
   });
+  it(
+    'creates exactly ONE pending invitation when invite() is called ' +
+      'concurrently for the same organization+email — the losing caller ' +
+      'receives a clean 409, not an unhandled 500 (Organizations/Members/' +
+      'Invitations audit race fix)',
+    async () => {
+      const raceInviteEmail = `race-invite.${runId}@example.com`;
+
+      const [first, second] = await Promise.all([
+        request(server)
+          .post(`/organizations/${orgId}/invitations`)
+          .set('Authorization', `Bearer ${ownerToken}`)
+          .send({ email: raceInviteEmail, role: 'viewer' }),
+        request(server)
+          .post(`/organizations/${orgId}/invitations`)
+          .set('Authorization', `Bearer ${ownerToken}`)
+          .send({ email: raceInviteEmail, role: 'viewer' }),
+      ]);
+
+      const statuses = [first.status, second.status].sort();
+      expect(statuses).toEqual([201, 409]);
+    },
+  );
+
+  it(
+    'creates exactly ONE membership when accept() is called ' +
+      'concurrently with the same token — the losing caller receives a ' +
+      'clean 409, not an unhandled 500 (Organizations/Members/' +
+      'Invitations audit race fix)',
+    async () => {
+      const raceAcceptEmail = `race-accept.${runId}@example.com`;
+      const raceAcceptToken = await registerAndLogin(
+        raceAcceptEmail,
+        'RaceAccept',
+      );
+
+      const inviteRes = await request(server)
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ email: raceAcceptEmail, role: 'viewer' })
+        .expect(201);
+      const invite = inviteRes.body as InvitationResponseBody;
+
+      const [first, second] = await Promise.all([
+        request(server)
+          .post(`/organizations/invitations/${invite.token}/accept`)
+          .set('Authorization', `Bearer ${raceAcceptToken}`),
+        request(server)
+          .post(`/organizations/invitations/${invite.token}/accept`)
+          .set('Authorization', `Bearer ${raceAcceptToken}`),
+      ]);
+
+      const statuses = [first.status, second.status].sort();
+      expect(statuses).toEqual([204, 409]);
+    },
+  );
 
   it('forbids a viewer from removing a member, but allows the owner to', async () => {
     const forbiddenRes = await request(server)

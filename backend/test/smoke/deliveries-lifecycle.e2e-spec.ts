@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../../src/app.module';
+import { AuthService } from '../../src/auth/auth.service';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 
 /**
@@ -21,9 +22,6 @@ import { HttpExceptionFilter } from '../../src/common/filters/http-exception.fil
  * timestamps recorded correctly.
  */
 
-interface AuthResponseBody {
-  accessToken: string;
-}
 interface OrganizationResponseBody {
   id: string;
 }
@@ -87,17 +85,14 @@ describe('Deliveries — Full Chain, State Machine, RBAC & Tenant Isolation (e2e
     email: string,
     firstName: string,
   ): Promise<string> => {
-    await request(server).post('/auth/register').send({
+    const authService = app.get(AuthService);
+    const { accessToken } = await authService.register({
       email,
       password: PASSWORD,
       firstName,
       lastName: 'Test',
     });
-    const loginRes = await request(server)
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-    return (loginRes.body as AuthResponseBody).accessToken;
+    return accessToken;
   };
 
   const inviteAndAccept = async (

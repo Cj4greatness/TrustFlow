@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
 import { User } from '../../users/entities/user.entity';
 import { JwtPayload } from '../types/jwt-payload.type';
+import { randomUUID } from 'crypto';
 
 export interface TokenPair {
   accessToken: string;
@@ -27,6 +28,7 @@ export class TokenService {
     return {
       sub: user.id,
       email: user.email,
+      jti: randomUUID(),
     };
   }
 

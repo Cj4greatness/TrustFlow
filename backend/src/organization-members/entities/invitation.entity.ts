@@ -42,6 +42,10 @@ export enum InvitationChannel {
 @Index(['token'], { unique: true })
 @Index(['organizationId'])
 @Index(['invitedEmail'])
+@Index(['organizationId', 'invitedEmail'], {
+  unique: true,
+  where: '"status" = \'pending\'',
+})
 export class Invitation extends BaseEntity {
   @Column({ type: 'uuid', name: 'organization_id' })
   organizationId: string;

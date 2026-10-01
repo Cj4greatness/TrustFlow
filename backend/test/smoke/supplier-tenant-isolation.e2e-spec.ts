@@ -1,9 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  INestApplication,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { INestApplication, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../../src/app.module';
 import { SuppliersService } from '../../src/suppliers/suppliers.service';
@@ -13,25 +9,6 @@ import { UsersService } from '../../src/users/users.service';
 import { OrganizationsService } from '../../src/organizations/organizations.service';
 import { PasswordService } from '../../src/security/password.service';
 
-/**
- * Suppliers — DI Resolution & Tenant Isolation (e2e)
- *
- * Calls SuppliersService/SupplierProductsService/ProductsService
- * directly, not through HTTP — the SUPPLIER_* permission matrix is
- * intentionally unassigned pending CTO decision (see
- * permission-matrix.ts), so an HTTP-level test would only ever see
- * 403 right now, which isn't a meaningful permanent assertion.
- *
- * This suite instead proves two things a compile check cannot:
- * (1) NestJS can actually resolve the SuppliersModule -> ProductsModule
- * cross-module dependency graph at runtime (SupplierProductsService
- * injects ProductsService from a different module) — a TypeScript
- * build has no visibility into this, as demonstrated earlier tonight
- * by the OrganizationMembersModule omission that compiled cleanly
- * but failed at boot; and (2) Suppliers Directive v1 §7's business
- * rules actually hold: cross-org isolation, cross-org product
- * association rejection, and duplicate-association rejection.
- */
 describe('Suppliers — DI Resolution & Tenant Isolation (e2e)', () => {
   let app: INestApplication;
   let suppliersService: SuppliersService;
@@ -172,26 +149,77 @@ describe('Suppliers — DI Resolution & Tenant Isolation (e2e)', () => {
     },
   );
 
-  it('rejects a duplicate supplier-product association within the same org', async () => {
-    const supplier = await suppliersService.createSupplier(
-      orgAId,
-      { name: 'Duplicate Test Supplier' },
-      userId,
-    );
-    const product = await productsService.createProduct(
-      orgAId,
-      { name: 'Duplicate Test Product', sku: sku(), sellingPrice: 100 },
-      userId,
-    );
+  it(
+    'returns the existing association when a duplicate supplier-product ' +
+      'pair is added within the same org (idempotent, not an error)',
+    async () => {
+      const supplier = await suppliersService.createSupplier(
+        orgAId,
+        { name: 'Duplicate Test Supplier' },
+        userId,
+      );
+      const product = await productsService.createProduct(
+        orgAId,
+        { name: 'Duplicate Test Product', sku: sku(), sellingPrice: 100 },
+        userId,
+      );
 
-    await supplierProductsService.addProductToSupplier(orgAId, supplier.id, {
-      productId: product.id,
-    });
+      const first = await supplierProductsService.addProductToSupplier(
+        orgAId,
+        supplier.id,
+        { productId: product.id },
+      );
 
-    await expect(
-      supplierProductsService.addProductToSupplier(orgAId, supplier.id, {
-        productId: product.id,
-      }),
-    ).rejects.toThrow(ConflictException);
-  });
+      const second = await supplierProductsService.addProductToSupplier(
+        orgAId,
+        supplier.id,
+        { productId: product.id },
+      );
+
+      expect(second.id).toBe(first.id);
+    },
+  );
+
+  it(
+    'creates exactly ONE association when addProductToSupplier is ' +
+      'called concurrently for the same supplier+product pair — both ' +
+      'calls succeed, returning the same association, rather than one ' +
+      'succeeding and the other throwing an unhandled 500',
+    async () => {
+      const supplier = await suppliersService.createSupplier(
+        orgAId,
+        { name: 'Concurrent Association Supplier' },
+        userId,
+      );
+      const product = await productsService.createProduct(
+        orgAId,
+        {
+          name: 'Concurrent Association Product',
+          sku: sku(),
+          sellingPrice: 100,
+        },
+        userId,
+      );
+
+      const [first, second] = await Promise.all([
+        supplierProductsService.addProductToSupplier(orgAId, supplier.id, {
+          productId: product.id,
+        }),
+        supplierProductsService.addProductToSupplier(orgAId, supplier.id, {
+          productId: product.id,
+        }),
+      ]);
+
+      expect(first.id).toBe(second.id);
+      expect(first.supplierId).toBe(supplier.id);
+      expect(first.productId).toBe(product.id);
+
+      const associations = await supplierProductsService.listSupplierProducts(
+        orgAId,
+        supplier.id,
+      );
+      const matching = associations.filter((a) => a.productId === product.id);
+      expect(matching).toHaveLength(1);
+    },
+  );
 });
