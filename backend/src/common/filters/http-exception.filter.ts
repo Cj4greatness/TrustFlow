@@ -17,14 +17,6 @@ interface ErrorResponseBody {
   details?: unknown;
 }
 
-/**
- * Normalizes every error thrown anywhere in the application into the
- * consistent JSON shape specified by the CTO:
- * { success, message, statusCode, timestamp, path }.
- *
- * Applied globally in main.ts so no controller needs to think about
- * error formatting individually.
- */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -40,8 +32,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     if (!isHttpException) {
-      // Unexpected errors are logged with full detail server-side,
-      // but never leaked to the client response.
       this.logger.error(
         exception instanceof Error ? exception.stack : String(exception),
       );
@@ -55,10 +45,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
     };
 
-    // If the exception carried a structured object (like our health
-    // check's { status, service, dependencies }), surface it under
-    // `details` rather than discarding it — useful for debugging
-    // without breaking the standard { success, message, ... } shape.
     const extraDetails = this.extractDetails(exception, isHttpException);
     if (extraDetails) {
       body.details = extraDetails;
@@ -89,10 +75,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return exceptionResponse;
     }
 
-    // The exception response was a plain object with no `message`
-    // key (e.g. our health check's { status, service, dependencies }).
-    // Fall back to a generic message; the object itself is still
-    // surfaced separately via `details`.
     return 'An error occurred';
   }
 
@@ -106,14 +88,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const exceptionResponse = (exception as HttpException).getResponse();
 
-    if (
-      typeof exceptionResponse === 'object' &&
-      exceptionResponse !== null &&
-      !('message' in exceptionResponse)
-    ) {
-      return exceptionResponse;
+    if (typeof exceptionResponse !== 'object' || exceptionResponse === null) {
+      return undefined;
     }
 
-    return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { message, statusCode, error, ...rest } = exceptionResponse as Record<
+      string,
+      unknown
+    >;
+    return Object.keys(rest).length > 0 ? rest : undefined;
   }
 }

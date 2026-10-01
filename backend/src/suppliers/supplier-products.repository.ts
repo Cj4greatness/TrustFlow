@@ -33,26 +33,21 @@ export class SupplierProductsRepository {
   }
 
   /**
-   * Backs the duplicate-association check (Directive v1 §7:
-   * "Supplier-product association should not be duplicated within
-   * an organization") — mirrors the partial unique index on
-   * (organizationId, supplierId, productId), giving the service a
-   * friendly ConflictException instead of a raw DB constraint
-   * violation.
+   * Backs addProductToSupplier()'s unique-violation race recovery —
+   * fetches the association a concurrent winner just inserted, so
+   * the loser can return it instead of surfacing the raw DB error.
+   * Also backs the up-front idempotent-return check in
+   * addProductToSupplier() (returns the existing association if the
+   * pair is already associated, rather than throwing).
    */
-  async existsBySupplierAndProduct(
+  async findBySupplierAndProduct(
     organizationId: string,
     supplierId: string,
     productId: string,
-  ): Promise<boolean> {
-    const qb = this.repository
-      .createQueryBuilder('sp')
-      .where('sp.organization_id = :organizationId', { organizationId })
-      .andWhere('sp.supplier_id = :supplierId', { supplierId })
-      .andWhere('sp.product_id = :productId', { productId })
-      .andWhere('sp.deleted_at IS NULL');
-
-    return (await qb.getCount()) > 0;
+  ): Promise<SupplierProduct | null> {
+    return this.repository.findOne({
+      where: { organizationId, supplierId, productId },
+    });
   }
 
   async softDelete(id: string): Promise<void> {

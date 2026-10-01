@@ -9,15 +9,13 @@ import { ReceiptsService } from '../../src/receipts/receipts.service';
 import { ReceiptSettingsService } from '../../src/receipt-settings/receipt-settings.service';
 import { DataSource } from 'typeorm';
 import { Receipt } from '../../src/receipts/entities/receipt.entity';
+import { AuthService } from '../../src/auth/auth.service';
 import {
   Payment,
   PaymentStatus,
   PaymentMethod,
 } from '../../src/payments/entities/payment.entity';
 
-interface AuthResponseBody {
-  accessToken: string;
-}
 interface OrganizationResponseBody {
   id: string;
   name: string;
@@ -83,17 +81,14 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
     email: string,
     firstName: string,
   ): Promise<string> => {
-    await request(server).post('/auth/register').send({
+    const authService = app.get(AuthService);
+    const { accessToken } = await authService.register({
       email,
       password: PASSWORD,
       firstName,
       lastName: 'Test',
     });
-    const loginRes = await request(server)
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-    return (loginRes.body as AuthResponseBody).accessToken;
+    return accessToken;
   };
 
   const inviteAndAccept = async (

@@ -1,8 +1,6 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource, QueryFailedError } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { SuppliersService } from './suppliers.service';
 import { ProductsService } from '../products/products.service';
 import { SupplierProductsRepository } from './supplier-products.repository';
@@ -10,20 +8,17 @@ import { CreateSupplierProductDto } from './dto/create-supplier-product.dto';
 import { UpdateSupplierProductDto } from './dto/update-supplier-product.dto';
 import { SupplierProduct } from './entities/supplier-product.entity';
 
+const POSTGRES_UNIQUE_VIOLATION = '23505';
+
 @Injectable()
 export class SupplierProductsService {
   constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly suppliersService: SuppliersService,
     private readonly productsService: ProductsService,
     private readonly supplierProductsRepository: SupplierProductsRepository,
   ) {}
 
-  /**
-   * Confirms the association belongs to the organization AND the
-   * supplied supplierId, mirroring
-   * CustomersService.getOwnedAddressOrThrow's nested-ownership-chain
-   * pattern.
-   */
   private async getOwnedAssociationOrThrow(
     organizationId: string,
     supplierId: string,
@@ -46,14 +41,6 @@ export class SupplierProductsService {
     return association;
   }
 
-  /**
-   * Associates a product with a supplier. Enforces Directive v1 §7:
-   * "A Supplier cannot be associated with a Product belonging to
-   * another organization" (via ProductsService.getOwnedProductOrThrow)
-   * and "Supplier-product association should not be duplicated
-   * within an organization" (via the pre-insert existence check,
-   * backed by the partial unique index as a defense-in-depth layer).
-   */
   async addProductToSupplier(
     organizationId: string,
     supplierId: string,
@@ -63,36 +50,51 @@ export class SupplierProductsService {
       organizationId,
       supplierId,
     );
-    // Confirms the product belongs to this organization too — the
-    // cross-tenant check the directive explicitly calls for.
     await this.productsService.getOwnedProductOrThrow(
       organizationId,
       dto.productId,
     );
 
-    const alreadyAssociated =
-      await this.supplierProductsRepository.existsBySupplierAndProduct(
+    const existing =
+      await this.supplierProductsRepository.findBySupplierAndProduct(
         organizationId,
         supplierId,
         dto.productId,
       );
-    if (alreadyAssociated) {
-      throw new ConflictException(
-        'This product is already associated with this supplier',
-      );
+    if (existing) {
+      return existing;
     }
 
-    const association = this.supplierProductsRepository.create({
-      organizationId,
-      supplierId,
-      productId: dto.productId,
-      supplierSku: dto.supplierSku ?? null,
-      unitCost: dto.unitCost !== undefined ? dto.unitCost.toFixed(2) : null,
-      leadTimeDays: dto.leadTimeDays ?? null,
-      minimumOrderQuantity: dto.minimumOrderQuantity ?? null,
-    });
-
-    return this.supplierProductsRepository.save(association);
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const association = manager.create(SupplierProduct, {
+          organizationId,
+          supplierId,
+          productId: dto.productId,
+          supplierSku: dto.supplierSku ?? null,
+          unitCost: dto.unitCost !== undefined ? dto.unitCost.toFixed(2) : null,
+          leadTimeDays: dto.leadTimeDays ?? null,
+          minimumOrderQuantity: dto.minimumOrderQuantity ?? null,
+        });
+        return manager.save(SupplierProduct, association);
+      });
+    } catch (err) {
+      if (
+        err instanceof QueryFailedError &&
+        (err as unknown as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION
+      ) {
+        const raceWinner =
+          await this.supplierProductsRepository.findBySupplierAndProduct(
+            organizationId,
+            supplierId,
+            dto.productId,
+          );
+        if (raceWinner) {
+          return raceWinner;
+        }
+      }
+      throw err;
+    }
   }
 
   async listSupplierProducts(

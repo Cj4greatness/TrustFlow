@@ -23,6 +23,9 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
+import { PermissionsGuard } from '../authorization/guards/permissions.guard';
+import { Permissions } from '../authorization/decorators/permissions.decorator';
+import { Permission } from '../authorization/permissions.enum';
 
 interface RequestWithUser extends Request {
   user: AuthenticatedUser;
@@ -30,7 +33,7 @@ interface RequestWithUser extends Request {
 
 @ApiTags('organizations')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 @Controller('organizations')
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
@@ -55,6 +58,7 @@ export class OrganizationsController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.ORGANIZATION_UPDATE)
   @ApiOperation({ summary: 'Update an organization' })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiResponse({ status: 200, type: OrganizationResponseDto })
