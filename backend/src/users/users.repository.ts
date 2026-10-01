@@ -62,9 +62,10 @@ export class UsersRepository {
    * clears it (null) on logout/revocation. Called after every
    * successful login/register/refresh, and on logout.
    *
-   * Also clears previousRefreshTokenHash/refreshTokenRotatedAt, so a
-   * logged-out or freshly-logged-in session can't still be recognized
-   * as "recently rotated" by a stale token from the old session.
+   * Also clears previousRefreshTokenHash/refreshTokenRotatedAt and
+   * displacedRefreshTokenHash/displacedAt, so a logged-out session
+   * can't still be recognized as "recently rotated" or "displaced"
+   * by a stale token from the old session.
    */
   async updateRefreshTokenHash(
     id: string,
@@ -76,6 +77,37 @@ export class UsersRepository {
         refreshTokenHash,
         previousRefreshTokenHash: null,
         refreshTokenRotatedAt: null,
+        displacedRefreshTokenHash: null,
+        displacedAt: null,
+      },
+    );
+  }
+
+  /**
+   * Replaces the user's refresh token hash on a fresh login, while
+   * preserving the outgoing hash as displacedRefreshTokenHash (with
+   * a timestamp) rather than discarding it. TrustFlow permits only
+   * one active session per user — this lets a now-displaced device's
+   * next refresh() attempt be recognized and given a clear reason
+   * (SESSION_REPLACED_BY_NEW_LOGIN) instead of a generic "invalid
+   * token" response indistinguishable from theft.
+   *
+   * Does NOT touch previousRefreshTokenHash/refreshTokenRotatedAt —
+   * those serve a separate, short-lived purpose (the rotation
+   * CAS-race grace window) and are irrelevant here.
+   */
+  async replaceRefreshTokenHashOnLogin(
+    id: string,
+    newRefreshTokenHash: string,
+  ): Promise<void> {
+    const user = await this.findById(id);
+
+    await this.repository.update(
+      { id },
+      {
+        refreshTokenHash: newRefreshTokenHash,
+        displacedRefreshTokenHash: user?.refreshTokenHash ?? null,
+        displacedAt: user?.refreshTokenHash ? new Date() : null,
       },
     );
   }

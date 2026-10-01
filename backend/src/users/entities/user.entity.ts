@@ -95,4 +95,28 @@ export class User extends BaseEntity {
     name: 'refresh_token_rotated_at',
   })
   refreshTokenRotatedAt: Date | null;
+
+  /**
+   * Hash of the refresh token that was valid immediately before the
+   * most recent login() replaced it — paired with displacedAt.
+   * TrustFlow permits one active refresh-token session per user; a
+   * successful login from another device replaces the existing
+   * session rather than coexisting with it. This lets the displaced
+   * device's next refresh() attempt be told SESSION_REPLACED_BY_NEW_LOGIN
+   * instead of being treated as generic token theft. Unlike
+   * previousRefreshTokenHash/refreshTokenRotatedAt (a short CAS-race
+   * grace window), this has no expiry — a displaced device may not
+   * attempt to refresh for hours or days. Cleared on logout.
+   */
+  @Exclude({ toPlainOnly: true })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'displaced_refresh_token_hash',
+  })
+  displacedRefreshTokenHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'displaced_at' })
+  displacedAt: Date | null;
 }
