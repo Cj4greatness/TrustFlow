@@ -638,6 +638,21 @@ describe('AI Foundation — Gateway, Usage, Memory, Tool Registry (e2e)', () => 
         ),
       ).rejects.toThrow();
     });
+
+    it('rejects a non-Owner role, since SUPPLIER_READ remains Owner-only', async () => {
+      await expect(
+        aiToolRegistry.execute(
+          'get_supplier',
+          { supplierId },
+          {
+            organizationId: orgAId,
+            memberId: userId,
+            role: OrganizationRole.VIEWER,
+            requestId: randomUUID(),
+          },
+        ),
+      ).rejects.toThrow(AiToolUnauthorizedError);
+    });
   });
 
   describe('get_payment tool — real Tool Registry entry', () => {
