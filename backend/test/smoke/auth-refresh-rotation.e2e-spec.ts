@@ -131,4 +131,37 @@ describe('Auth — Refresh Token Rotation Concurrency (e2e)', () => {
 
     expect(postWipeRes.status).toBe(401);
   });
+
+  it('a login from another device displaces the first session, with a distinguishable reason on its next refresh', async () => {
+    const authService = app.get(AuthService);
+    const email = `rr-displaced.${runId}@example.com`;
+
+    // "Device A" — registering creates the first session.
+    const deviceA = await authService.register({
+      email,
+      password: PASSWORD,
+      firstName: 'Displaced',
+      lastName: 'Test',
+    });
+
+    // "Device B" — logging in with the same credentials displaces Device A's session.
+    const deviceB = await authService.login({ email, password: PASSWORD });
+
+    // Device A's refresh token should now be recognized as displaced,
+    // not treated as generic theft.
+    const deviceARes = await request(server)
+      .post('/auth/refresh')
+      .send({ refreshToken: deviceA.refreshToken });
+
+    expect(deviceARes.status).toBe(401);
+    const deviceABody = deviceARes.body as ErrorResponseBody;
+    expect(deviceABody.details?.code).toBe('SESSION_REPLACED_BY_NEW_LOGIN');
+
+    // Device B's session must be unaffected — it's the one that won.
+    const deviceBRes = await request(server)
+      .post('/auth/refresh')
+      .send({ refreshToken: deviceB.refreshToken });
+
+    expect(deviceBRes.status).toBe(200);
+  });
 });

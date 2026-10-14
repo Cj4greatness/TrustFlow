@@ -179,6 +179,44 @@ describe('Auth Rate Limiting (e2e)', () => {
     });
   });
 
+  describe('login — timing side-channel (email enumeration)', () => {
+    it('returns the identical response shape/message for a non-existent email and a wrong password for a real one', async () => {
+      const realEmail = uniqueEmail('timing-real');
+
+      await request(server)
+        .post('/auth/register')
+        .set('X-Test-Client-Ip', uniqueIp())
+        .send({
+          email: realEmail,
+          password: PASSWORD,
+          firstName: 'Timing',
+          lastName: 'Test',
+        });
+
+      const nonExistentRes = await request(server)
+        .post('/auth/login')
+        .set('X-Test-Client-Ip', uniqueIp())
+        .send({
+          email: uniqueEmail('timing-nonexistent'),
+          password: 'WrongPassword1',
+        });
+
+      const wrongPasswordRes = await request(server)
+        .post('/auth/login')
+        .set('X-Test-Client-Ip', uniqueIp())
+        .send({ email: realEmail, password: 'WrongPassword1' });
+
+      // Both must be indistinguishable from the response alone — same
+      // status and same message, so a client (or attacker) can't tell
+      // "no such account" apart from "account exists, wrong password".
+      expect(nonExistentRes.status).toBe(401);
+      expect(wrongPasswordRes.status).toBe(401);
+      expect((nonExistentRes.body as ErrorResponseBody).message).toEqual(
+        (wrongPasswordRes.body as ErrorResponseBody).message,
+      );
+    });
+  });
+
   describe('login — 429 response shape', () => {
     it('exposes retry information in both the Retry-After header and the JSON body', async () => {
       const ip = uniqueIp();
