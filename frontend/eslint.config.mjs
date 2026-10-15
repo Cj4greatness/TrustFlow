@@ -6,7 +6,7 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
-    globalIgnores([
+  globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
@@ -15,4 +15,6 @@ const eslintConfig = defineConfig([
     // Generated from docs/openapi.json by `pnpm api:types`. Do not edit or lint.
     "src/api/schema.d.ts",
   ]),
+]);
+
 export default eslintConfig;
