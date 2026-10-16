@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { buildCorsOptions } from './common/cors/cors.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
@@ -35,6 +37,20 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // CORS: explicit origin allowlist from CORS_ALLOWED_ORIGINS (validated at
+  // config load; a wildcard or malformed value stops startup). Bearer tokens
+  // only, so credentials stay off. Unset/empty = CORS not enabled. See
+  // common/cors/cors.config.ts for the full policy and rationale.
+  const corsAllowedOrigins = app
+    .get(ConfigService)
+    .get<string[]>('cors.allowedOrigins', []);
+  if (corsAllowedOrigins.length > 0) {
+    app.enableCors(buildCorsOptions(corsAllowedOrigins));
+    console.log(`CORS enabled for: ${corsAllowedOrigins.join(', ')}`);
+  } else {
+    console.log('CORS disabled (CORS_ALLOWED_ORIGINS is not set)');
+  }
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('TrustFlow API')

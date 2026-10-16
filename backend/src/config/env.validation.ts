@@ -26,6 +26,12 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 
+  // Comma-separated exact browser origins allowed to call the API
+  // (e.g. "http://localhost:3000"). Empty/unset = CORS disabled. The value
+  // is strictly parsed and validated in common/cors/cors.config.ts; a
+  // wildcard or malformed entry stops the app at startup.
+  CORS_ALLOWED_ORIGINS: Joi.string().allow('').default(''),
+
   // Optional: if unset, the AI Gateway falls back to a placeholder
   // provider that fails loud on use rather than silently no-op'ing.
   // Not required at boot so existing dev/CI environments without a

@@ -6,9 +6,15 @@
  * inject ConfigService and read through this structure instead. This
  * keeps configuration typed, testable, and easy to audit.
  */
+import { parseAllowedOrigins } from '../common/cors/cors.config';
+
 export interface AppConfig {
   env: string;
   port: number;
+  cors: {
+    /** Exact browser origins allowed to call the API. Empty = CORS off. */
+    allowedOrigins: string[];
+  };
   database: {
     host: string;
     port: number;
@@ -38,6 +44,12 @@ export interface AppConfig {
 export default (): AppConfig => ({
   env: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '4000', 10),
+  cors: {
+    allowedOrigins: parseAllowedOrigins(
+      process.env.CORS_ALLOWED_ORIGINS,
+      process.env.NODE_ENV ?? 'development',
+    ),
+  },
   database: {
     host: process.env.DB_HOST!,
     port: parseInt(process.env.DB_PORT ?? '5432', 10),
