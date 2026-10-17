@@ -338,6 +338,48 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Concurrency hardening (Backend Readiness & Freeze Audit, CTO
+   * directive D4): every status transition that has side effects
+   * follows the same shape —
+   *
+   *   1. cheap, UNLOCKED pre-check outside the transaction (fail
+   *      fast on a plainly illegal request, e.g. a sequential replay
+   *      of an already-completed transition);
+   *   2. take the order row's pessimistic_write lock FIRST, before
+   *      touching inventory or any other resource;
+   *   3. re-validate against the LOCKED row, because the unlocked
+   *      read in step 1 can be stale by the time the lock is granted.
+   *      If a concurrent request already performed this exact
+   *      transition, return the order as an idempotent no-op (same
+   *      convention as processOrder(), Payment idempotency keys and
+   *      the Receipt listener); if the locked status makes the
+   *      transition illegal, 400 as usual;
+   *   4. only then apply side effects, derived from the LOCKED
+   *      status and re-read child rows.
+   *
+   * Locking the order before the inventory rows also gives every
+   * transition one consistent lock order (order -> inventory), which
+   * rules out order/inventory deadlocks between confirm, cancel and
+   * process.
+   */
+  private async lockOrderForTransition(
+    ordersRepo: ReturnType<OrdersRepository['withTransaction']>,
+    orderId: string,
+    organizationId: string,
+    to: OrderStatus,
+  ): Promise<{ order: Order; alreadyInTargetState: boolean }> {
+    const locked = await ordersRepo.findByIdForUpdate(orderId);
+    if (!locked || locked.organizationId !== organizationId) {
+      throw new NotFoundException('Order not found in this organization');
+    }
+    if (locked.status === to) {
+      return { order: locked, alreadyInTargetState: true };
+    }
+    this.assertTransitionAllowed(locked, to);
+    return { order: locked, alreadyInTargetState: false };
+  }
+
   async confirmOrder(
     organizationId: string,
     orderId: string,
@@ -346,13 +388,29 @@ export class OrdersService {
     const order = await this.getOwnedOrderOrThrow(organizationId, orderId);
     this.assertTransitionAllowed(order, OrderStatus.CONFIRMED);
 
-    const items = await this.orderItemsRepository.findByOrderId(orderId);
-    if (items.length === 0) {
-      throw new BadRequestException('Cannot confirm an order with no items');
-    }
-
     return this.dataSource.transaction(async (manager) => {
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
+
+      // Lock BEFORE deducting inventory — previously the deduction
+      // ran first, so two concurrent confirms could both deduct.
+      const { order: lockedOrder, alreadyInTargetState } =
+        await this.lockOrderForTransition(
+          ordersRepo,
+          orderId,
+          organizationId,
+          OrderStatus.CONFIRMED,
+        );
+      if (alreadyInTargetState) {
+        return lockedOrder;
+      }
+
+      // Items are only mutable while DRAFT, and the lock plus the
+      // DRAFT check above means this read cannot go stale again.
+      const items = await orderItemsRepo.findByOrderId(orderId);
+      if (items.length === 0) {
+        throw new BadRequestException('Cannot confirm an order with no items');
+      }
 
       for (const item of items) {
         await this.inventoryService.adjustInventory(
@@ -361,17 +419,13 @@ export class OrdersService {
           {
             type: InventoryMovementType.REMOVE,
             quantity: item.quantity,
-            reason: `Order ${order.orderNumber} confirmed`,
+            reason: `Order ${lockedOrder.orderNumber} confirmed`,
           },
           createdByUserId,
           manager,
         );
       }
 
-      const lockedOrder = await ordersRepo.findByIdForUpdate(orderId);
-      if (!lockedOrder) {
-        throw new NotFoundException('Order not found');
-      }
       lockedOrder.status = OrderStatus.CONFIRMED;
       const savedOrder = await ordersRepo.save(lockedOrder);
 
@@ -457,12 +511,34 @@ export class OrdersService {
     });
   }
 
+  /**
+   * Concurrency hardening: previously had no transaction and no lock,
+   * so a concurrent cancelOrder() could be silently overwritten
+   * (lost update) — leaving an order COMPLETED whose inventory had
+   * just been restored by the cancel. Now follows the same
+   * lock-first / re-check shape as the other transitions.
+   */
   async completeOrder(organizationId: string, orderId: string): Promise<Order> {
     const order = await this.getOwnedOrderOrThrow(organizationId, orderId);
     this.assertTransitionAllowed(order, OrderStatus.COMPLETED);
 
-    order.status = OrderStatus.COMPLETED;
-    return this.ordersRepository.save(order);
+    return this.dataSource.transaction(async (manager) => {
+      const ordersRepo = this.ordersRepository.withTransaction(manager);
+
+      const { order: lockedOrder, alreadyInTargetState } =
+        await this.lockOrderForTransition(
+          ordersRepo,
+          orderId,
+          organizationId,
+          OrderStatus.COMPLETED,
+        );
+      if (alreadyInTargetState) {
+        return lockedOrder;
+      }
+
+      lockedOrder.status = OrderStatus.COMPLETED;
+      return ordersRepo.save(lockedOrder);
+    });
   }
 
   async cancelOrder(
@@ -473,32 +549,45 @@ export class OrdersService {
     const order = await this.getOwnedOrderOrThrow(organizationId, orderId);
     this.assertTransitionAllowed(order, OrderStatus.CANCELLED);
 
-    const needsRestore = cancellationRequiresInventoryRestore(order.status);
-    const items = needsRestore
-      ? await this.orderItemsRepository.findByOrderId(orderId)
-      : [];
-
     return this.dataSource.transaction(async (manager) => {
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
 
-      for (const item of items) {
-        await this.inventoryService.adjustInventory(
+      // Lock BEFORE restoring inventory — previously the restore ran
+      // first, so two concurrent cancels could both restore, and a
+      // cancel racing processOrder() could cancel an order that had
+      // just been given a Delivery.
+      const { order: lockedOrder, alreadyInTargetState } =
+        await this.lockOrderForTransition(
+          ordersRepo,
+          orderId,
           organizationId,
-          item.productId,
-          {
-            type: InventoryMovementType.ADD,
-            quantity: item.quantity,
-            reason: `Order ${order.orderNumber} cancelled — inventory restored`,
-          },
-          createdByUserId,
-          manager,
+          OrderStatus.CANCELLED,
         );
+      if (alreadyInTargetState) {
+        return lockedOrder;
       }
 
-      const lockedOrder = await ordersRepo.findByIdForUpdate(orderId);
-      if (!lockedOrder) {
-        throw new NotFoundException('Order not found');
+      // Whether inventory needs restoring is decided from the LOCKED
+      // status, not the stale pre-lock read: the order may have moved
+      // DRAFT -> CONFIRMED (now needs restore) in between.
+      if (cancellationRequiresInventoryRestore(lockedOrder.status)) {
+        const items = await orderItemsRepo.findByOrderId(orderId);
+        for (const item of items) {
+          await this.inventoryService.adjustInventory(
+            organizationId,
+            item.productId,
+            {
+              type: InventoryMovementType.ADD,
+              quantity: item.quantity,
+              reason: `Order ${lockedOrder.orderNumber} cancelled — inventory restored`,
+            },
+            createdByUserId,
+            manager,
+          );
+        }
       }
+
       lockedOrder.status = OrderStatus.CANCELLED;
       return ordersRepo.save(lockedOrder);
     });
