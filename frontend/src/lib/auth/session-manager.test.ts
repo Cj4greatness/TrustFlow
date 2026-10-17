@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, AUTH_ERROR_CODES } from "../../api/errors";
-import { createSessionManager } from "./session-manager";
+import type { RunExclusive } from "./cross-tab-lock";
+import {
+  createSessionManager,
+  REFRESH_LOCK_NAME,
+  type SessionManagerOptions,
+} from "./session-manager";
 import type { Session } from "./types";
 
 const user = {
@@ -24,10 +29,18 @@ const rotated = () =>
 const replaced = () =>
   unauthorized(AUTH_ERROR_CODES.SESSION_REPLACED_BY_NEW_LOGIN);
 
-function setup(callRefresh: () => Promise<Session>) {
+function setup(
+  callRefresh: () => Promise<Session>,
+  extra: Partial<SessionManagerOptions> = {},
+) {
   const onEnded = vi.fn();
   const wait = vi.fn(async () => {});
-  const manager = createSessionManager({ callRefresh, onEnded, wait });
+  const manager = createSessionManager({
+    callRefresh,
+    onEnded,
+    wait,
+    ...extra,
+  });
   return { manager, onEnded, wait };
 }
 
@@ -59,7 +72,23 @@ describe("session manager", () => {
     expect(manager.getAccessToken()).toBe("after-retry");
   });
 
-  it("stops after one retry and leaves the session untouched when still rotated", async () => {
+  it("allows a second bounded retry with a longer delay", async () => {
+    const callRefresh = vi
+      .fn<() => Promise<Session>>()
+      .mockRejectedValueOnce(rotated())
+      .mockRejectedValueOnce(rotated())
+      .mockResolvedValueOnce(sessionWith("after-two-retries"));
+    const { manager, onEnded, wait } = setup(callRefresh);
+
+    await manager.refresh();
+
+    expect(callRefresh).toHaveBeenCalledTimes(3);
+    expect(wait.mock.calls).toEqual([[400], [1200]]);
+    expect(onEnded).not.toHaveBeenCalled();
+    expect(manager.getAccessToken()).toBe("after-two-retries");
+  });
+
+  it("stops after two retries and leaves the session untouched when still rotated", async () => {
     const callRefresh = vi.fn(async () => {
       throw rotated();
     });
@@ -68,9 +97,21 @@ describe("session manager", () => {
 
     await expect(manager.refresh()).rejects.toBeInstanceOf(ApiError);
 
-    expect(callRefresh).toHaveBeenCalledTimes(2);
+    expect(callRefresh).toHaveBeenCalledTimes(3);
     expect(onEnded).not.toHaveBeenCalled();
     expect(manager.getAccessToken()).toBe("existing");
+  });
+
+  it("does not retry at all when no retry delays are configured", async () => {
+    const callRefresh = vi.fn(async () => {
+      throw rotated();
+    });
+    const { manager, wait } = setup(callRefresh, { rotatedRetryDelaysMs: [] });
+
+    await expect(manager.refresh()).rejects.toBeInstanceOf(ApiError);
+
+    expect(callRefresh).toHaveBeenCalledTimes(1);
+    expect(wait).not.toHaveBeenCalled();
   });
 
   it("ends the session with the dedicated reason on SESSION_REPLACED_BY_NEW_LOGIN", async () => {
@@ -128,6 +169,22 @@ describe("session manager", () => {
 
     await expect(manager.refresh()).rejects.toBeInstanceOf(ApiError);
     expect(callRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs the refresh inside the cross-tab lock, once for concurrent callers", async () => {
+    const runExclusive = vi.fn(
+      async (_name: string, task: () => Promise<unknown>) => task(),
+    );
+    const { manager } = setup(
+      vi.fn(async () => sessionWith("locked")),
+      { runExclusive: runExclusive as unknown as RunExclusive },
+    );
+
+    await Promise.all([manager.refresh(), manager.refresh()]);
+
+    expect(runExclusive).toHaveBeenCalledTimes(1);
+    expect(runExclusive.mock.calls[0][0]).toBe(REFRESH_LOCK_NAME);
+    expect(manager.getAccessToken()).toBe("locked");
   });
 
   it("clear() drops the in-memory session", () => {
