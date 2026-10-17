@@ -1,0 +1,106 @@
+# Frontend Session Design
+
+Status: DRAFT v2 for CTO approval (decision D1). Revised after senior review (approve with conditions).
+Verified 2026-10-17 against a local backend built from `develop` at 11158814.
+Legend: **[Built]** implemented and tested. **[Verified live]** also exercised against the running backend. **[Planned]** not built. **[Open]** needs a decision.
+
+## 1. Summary
+
+The browser keeps the access token in memory only. The refresh token lives only in an HttpOnly cookie that is set and read by four Next.js routes under `/api/auth/*`. The BFF is not a proxy: all business data requests go from the browser straight to the backend, which must allow the frontend origin through a CORS allowlist. A CORS implementation exists on a backend branch but is not merged, and two implementations exist; consolidation is pending.
+
+    Browser --(/api/auth/*, cookie, CSRF header)--> Next.js BFF --> Backend /auth/*
+    Browser --(Authorization: Bearer, CORS)-------------------------> Backend /organizations/*
+
+## 2. Backend contract relied on (verified)
+
+- `POST /auth/login`, `/auth/register`, `/auth/refresh` return `{ user, accessToken, refreshToken }` in the JSON body. No `Set-Cookie` from the backend.
+- Access token lifetime 15 minutes; refresh token lifetime 7 days (backend defaults).
+- Refresh rotates the token on every call. Replaying an old token returns 401 with `details.code` `REFRESH_TOKEN_RECENTLY_ROTATED` (lost a race inside the rotation window; non-destructive). A displaced session returns 401 with `SESSION_REPLACED_BY_NEW_LOGIN`. Any other refresh 401 means the session is dead.
+- One refresh token per user: a new login anywhere replaces the previous session.
+- `POST /auth/logout` needs a bearer access token and returns 204.
+- Login and register are throttled (5 per window per IP; login also per email) and send `X-RateLimit-*` headers.
+- Error bodies: `{ success: false, message: string | string[], statusCode, timestamp, path, details? }`.
+
+## 3. Token lifecycle
+
+1. Sign-in: the browser POSTs credentials to `/api/auth/login`. The BFF calls the backend, sets the cookie, and returns `{ accessToken, user }` only. **[Verified live]**
+2. Page load: the app calls `/api/auth/refresh`. If the cookie exists the session is restored; if not, the BFF answers 401 `NO_SESSION` without calling the backend. **[Built; bootstrap UI planned]**
+3. Data requests: the API client sends the in-memory access token. On a 401 it refreshes once and replays the request once; a 401 means the handler never ran, so the replay cannot duplicate a write. A second 401 is surfaced. **[Built]**
+4. Concurrent refreshes in one tab share a single in-flight promise. **[Built]**
+5. Across tabs, refreshes run one at a time through the Web Locks API (lock `trustflow-session-refresh`). Where Web Locks is unavailable the refresh runs directly and the rotation retry below is the fallback. **[Built; wiring into the browser bootstrap planned]**
+6. `REFRESH_TOKEN_RECENTLY_ROTATED` is non-destructive: wait 400 ms and retry, then wait 1200 ms and retry once more. If it is still rotated, the error is surfaced and the session is left untouched. No loop. **[Built; replay verified live]**
+7. `SESSION_REPLACED_BY_NEW_LOGIN` ends the session and shows the dedicated message. Any other refresh 401 ends the session as expired. **[Built]**
+8. Network errors and 5xx never end the session and are never retried: the outcome is unknown. **[Built]**
+9. A failed refresh is never retried automatically, so refresh cannot loop. **[Built]**
+
+## 4. Cookie policy
+
+| Attribute | Value |
+|---|---|
+| Name | `tf_refresh` |
+| HttpOnly | yes |
+| Secure | yes in production; off only for local http development |
+| SameSite | Strict (refresh is a same-site `fetch`, so email links still work) |
+| Path | `/api/auth`, so it is never sent to any other route |
+| Max-Age | 7 days; the backend remains the authority on expiry |
+
+Cleared on a definitive dead-session 401 and on logout. Not cleared on a lost rotation race, throttling, or server errors. **[Built; attributes verified live except Secure, covered by unit tests]**
+
+## 5. CSRF
+
+Stateless, so it works across instances. Every BFF POST needs the `X-TrustFlow-CSRF: 1` header and must be provably same-origin (`Sec-Fetch-Site: same-origin`, falling back to comparing `Origin` with the host, honouring `X-Forwarded-Host`). If origin cannot be verified the request is refused. **[Built; 403 verified live]**
+
+## 6. Logout
+
+The client refreshes first to obtain a fresh access token, then calls `/api/auth/logout` with it. The BFF forwards the bearer token to the backend `POST /auth/logout`, always clears the cookie, and returns `{ backendSessionEnded }` honestly. No backend change is needed, and the earlier request to allow logout with a refresh token is withdrawn. **[BFF verified live; client refresh-then-logout planned]**
+
+## 7. Proxy restrictions
+
+The BFF is not a proxy. It exposes exactly four routes: `login`, `register`, `refresh`, `logout`. Each calls one fixed backend path chosen in code, never taken from the request, so there is no SSRF surface. Login and register forward only allowlisted body fields. Browser cookies are never forwarded upstream; refresh sends the token in the request body as the backend expects. Only `Authorization` is forwarded on logout. Upstream errors are re-emitted with `message`, `statusCode` and `details.code` only; rate-limit headers are passed through. Upstream timeout 10 s. `BACKEND_URL` is server-only configuration. **[Built]**
+
+## 8. XSS exposure of the in-memory access token
+
+Because the browser holds the access token, an XSS bug could read it. Mitigations in place: token in memory only and never in localStorage, sessionStorage or IndexedDB **[Built]**; 15-minute lifetime **[backend]**; refresh token unreachable from JavaScript **[Built]**.
+
+Content-Security-Policy is **not yet built** and is a production requirement. Plan, in two phases:
+1. Report-only: a nonce-based policy (`default-src 'self'`, nonce `script-src`, `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`, `connect-src` limited to self and the API origin) delivered as `Content-Security-Policy-Report-Only`, with violations collected and reviewed. **[Planned]**
+2. Enforced: switch to `Content-Security-Policy` once the report-only phase is clean. **[Planned]**
+
+Also planned: no third-party scripts without approval; a lint rule banning `dangerouslySetInnerHTML`; dependencies pinned and reviewed.
+
+## 9. Lost refresh response (accepted v1 risk, pending approval)
+
+Refresh rotates the token on every page load. If a refresh response is lost on an unreliable network, the browser keeps the old cookie. After the backend's rotation window (about 10 seconds) the old token counts as reuse and the backend ends the session. The BFF cannot prevent this. For v1 we propose to accept it, with a clear "you were signed out, please sign in again" message and logging of how often it happens so the risk can be measured. **[Open: CTO to accept]**
+
+## 10. Session lifetime
+
+Refresh is sliding: a session lasts indefinitely while the user keeps using the app, because each refresh issues a new 7-day token. An absolute maximum would need a backend change. **[Open: sliding for v1, or an absolute cap and its value]**
+
+## 11. Horizontal scaling and deployment (Cloud Run direction)
+
+The BFF keeps no state: no sessions, no in-memory guards that correctness depends on. Across instances, the backend's compare-and-swap rotation, the retries and the cross-tab lock are the safety net. Checklist before production **[Open]**:
+- Serve over HTTPS so the `Secure` cookie is on.
+- Set `BACKEND_URL` (server) and the browser API URL.
+- Add the frontend origin to the backend `CORS_ALLOWED_ORIGINS` (never `*`).
+- Run as a Next.js server container, not a static export.
+- Verify the proxy hop count on the real platform.
+
+## 12. Open issue: login throttle behind the BFF
+
+The backend throttles login per client IP. Behind the BFF every user arrives from the BFF's address, so one bucket serves everyone (tested: the 6th login from one IP gets a 429 for 900 s). A fixed trust-proxy hop count alone is unsafe for a public API, because a direct caller could forge `X-Forwarded-For` and choose its own limiter key. The reviewer recommends `trust proxy = 1` plus the BFF sending the user's IP with a shared secret that the backend verifies before honouring it. This is a backend security-control change and needs CTO approval. **[Open]** BFF login and register must not go to production until it is decided and built. Refresh and logout are unaffected. The BFF side (reading the client IP and sending it with the secret) is built only after approval.
+
+## 13. Evidence (local)
+
+- No CSRF header: 403.
+- Login: 200; cookie `tf_refresh; Path=/api/auth; Max-Age=604800; HttpOnly; SameSite=strict`; body has `accessToken` and `user`, no refresh token.
+- Refresh: 200 with a rotated cookie. Replay of the old cookie: 401 `REFRESH_TOKEN_RECENTLY_ROTATED`, no `Set-Cookie`.
+- Logout: `{"backendSessionEnded":true}` and a `Max-Age=0` cookie. Refresh afterwards: 401 `NO_SESSION`.
+- Automated: 88 frontend tests passing, `tsc`, lint and build clean. The reviewer has not yet seen the frontend code, because the branch is not on the remote.
+
+## 14. Decisions requested
+
+1. Approve this session design, with the conditions above.
+2. Approve authenticated client-IP forwarding with `trust proxy = 1` (section 12).
+3. Sliding 7-day sessions for v1, or an absolute maximum and its value (section 10).
+4. Accept the lost-refresh-response risk for v1 (section 9).
+5. Approve the CSP plan as a production requirement (section 8).
