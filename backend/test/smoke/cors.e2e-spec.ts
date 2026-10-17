@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { buildCorsOptions } from '../../src/common/cors/cors.config';
+import { RedisService } from '../../src/redis/redis.service';
 
 /**
  * CORS allowlist (e2e)
@@ -32,7 +33,16 @@ describe('CORS allowlist (e2e)', () => {
     await app.init();
   }, 30000);
 
+  const clearThrottleKeys = async () => {
+    const client = app.get(RedisService).getClient();
+    const keys = await client.keys('throttle:*');
+    if (keys.length > 0) await client.del(...keys);
+  };
+
   afterAll(async () => {
+    // The 429 test below fills this machine's login throttle bucket; leave
+    // no state behind for other suites.
+    await clearThrottleKeys();
     await app.close();
   });
 
@@ -129,6 +139,74 @@ describe('CORS allowlist (e2e)', () => {
 
       expect(res.status).toBe(200);
       expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    });
+  });
+
+  describe('error responses and throttling', () => {
+    beforeEach(clearThrottleKeys);
+
+    it('carries CORS headers on a 401 so the browser can read the error', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/organizations/me')
+        .set('Origin', ALLOWED);
+
+      expect(res.status).toBe(401);
+      expect(res.headers['access-control-allow-origin']).toBe(ALLOWED);
+    });
+
+    it('carries CORS headers on a 404', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/no-such-route')
+        .set('Origin', ALLOWED);
+
+      expect(res.status).toBe(404);
+      expect(res.headers['access-control-allow-origin']).toBe(ALLOWED);
+    });
+
+    it('carries CORS headers, and exposes Retry-After, on a 429', async () => {
+      const email = `cors-429-${Date.now()}@example.com`;
+      let last = await request(app.getHttpServer())
+        .post('/auth/login')
+        .set('Origin', ALLOWED)
+        .send({ email, password: 'wrong-password-1' });
+
+      for (let i = 0; i < 5 && last.status !== 429; i++) {
+        last = await request(app.getHttpServer())
+          .post('/auth/login')
+          .set('Origin', ALLOWED)
+          .send({ email, password: 'wrong-password-1' });
+      }
+
+      expect(last.status).toBe(429);
+      expect(last.headers['access-control-allow-origin']).toBe(ALLOWED);
+      expect(last.headers['retry-after']).toBeDefined();
+      expect(last.headers['access-control-expose-headers']).toContain(
+        'Retry-After',
+      );
+    });
+
+    it('does not count preflight (OPTIONS) requests against the login throttle', async () => {
+      // Far more preflights than the 5-per-window login limit.
+      for (let i = 0; i < 12; i++) {
+        const pre = await request(app.getHttpServer())
+          .options('/auth/login')
+          .set('Origin', ALLOWED)
+          .set('Access-Control-Request-Method', 'POST')
+          .set('Access-Control-Request-Headers', 'content-type');
+        expect(pre.status).toBe(204);
+      }
+
+      // The real login must still be answered by the handler (401 for bad
+      // credentials), not blocked by the throttler (429).
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .set('Origin', ALLOWED)
+        .send({
+          email: `cors-preflight-${Date.now()}@example.com`,
+          password: 'wrong-password-1',
+        });
+
+      expect(res.status).toBe(401);
     });
   });
 });
