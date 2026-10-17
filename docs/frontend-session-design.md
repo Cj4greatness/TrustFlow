@@ -62,9 +62,17 @@ The BFF is not a proxy. It exposes exactly four routes: `login`, `register`, `re
 
 Because the browser holds the access token, an XSS bug could read it. Mitigations in place: token in memory only and never in localStorage, sessionStorage or IndexedDB **[Built]**; 15-minute lifetime **[backend]**; refresh token unreachable from JavaScript **[Built]**.
 
-Content-Security-Policy is **not yet built** and is a production requirement. Plan, in two phases:
-1. Report-only: a nonce-based policy (`default-src 'self'`, nonce `script-src`, `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`, `connect-src` limited to self and the API origin) delivered as `Content-Security-Policy-Report-Only`, with violations collected and reviewed. **[Planned]**
-2. Enforced: switch to `Content-Security-Policy` once the report-only phase is clean. **[Planned]**
+Content-Security-Policy is built in **report-only mode**. Enforcement is not yet built and remains a production requirement.
+
+Phase 1, report-only, is built: `src/proxy.ts` sets a per-request nonce policy, delivered as `Content-Security-Policy-Report-Only`: `default-src 'self'`; `script-src 'self'` with the nonce and `'strict-dynamic'`; nonce `style-src`; `img-src 'self' blob: data:`; `font-src 'self'`; `connect-src 'self'`; `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`; `frame-ancestors 'none'`. The root layout uses `await connection()` so pages render per request and receive the nonce. **[Built]**
+
+Verified locally on a production build: the nonce differs on every request and matches every nonce attribute in the HTML, no enforcing header is sent, and the browser console in a clean guest window (no extensions) shows no violations. This was checked on the current placeholder page only.
+
+Remaining before enforcement:
+1. `connect-src` allows only self. The API origin must be added when the browser client calls the backend directly. **[Planned]**
+2. Violation collection: there is no report endpoint yet, so violations are visible only in the browser console. **[Planned]**
+3. Repeat the browser check as the login and register screens and fonts land. **[Planned]**
+4. Enforced: switch to `Content-Security-Policy` once the report-only phase is clean. **[Planned]**
 
 Also planned: no third-party scripts without approval; a lint rule banning `dangerouslySetInnerHTML`; dependencies pinned and reviewed.
 
@@ -95,7 +103,8 @@ The backend throttles login per client IP. Behind the BFF every user arrives fro
 - Login: 200; cookie `tf_refresh; Path=/api/auth; Max-Age=604800; HttpOnly; SameSite=strict`; body has `accessToken` and `user`, no refresh token.
 - Refresh: 200 with a rotated cookie. Replay of the old cookie: 401 `REFRESH_TOKEN_RECENTLY_ROTATED`, no `Set-Cookie`.
 - Logout: `{"backendSessionEnded":true}` and a `Max-Age=0` cookie. Refresh afterwards: 401 `NO_SESSION`.
-- Automated: 88 frontend tests passing, `tsc`, lint and build clean. The reviewer has not yet seen the frontend code, because the branch is not on the remote.
+- CSP (report-only), production build on port 3002: the `Content-Security-Policy-Report-Only` nonce differed between two requests and matched every nonce attribute in the HTML (13 of 13, no script tag without a nonce); no enforcing `Content-Security-Policy` header was sent; a clean browser guest window showed an empty console and no issues. Checked on the placeholder page only.
+- Automated: 97 frontend tests passing, `tsc`, lint and build clean. The reviewer has not yet seen the frontend code, because the branch is not on the remote.
 
 ## 14. Decisions requested
 
