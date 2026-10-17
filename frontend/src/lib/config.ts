@@ -18,3 +18,18 @@ export function getServerConfig(): ServerConfig {
     isProduction: process.env.NODE_ENV === "production",
   };
 }
+
+export type SecurityConfig = {
+  isDevelopment: boolean;
+  /** Public API URL the browser calls directly (backend CORS). Optional until the browser client exists. */
+  apiUrl: string | undefined;
+};
+
+// Separate from getServerConfig on purpose: it does not require BACKEND_URL,
+// so the proxy cannot fail every page request if that variable is missing.
+export function getSecurityConfig(): SecurityConfig {
+  return {
+    isDevelopment: process.env.NODE_ENV === "development",
+    apiUrl: process.env.NEXT_PUBLIC_API_URL || undefined,
+  };
+}
