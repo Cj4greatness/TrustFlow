@@ -66,13 +66,12 @@ Content-Security-Policy is built in **report-only mode**. Enforcement is not yet
 
 Phase 1, report-only, is built: `src/proxy.ts` sets a per-request nonce policy, delivered as `Content-Security-Policy-Report-Only`: `default-src 'self'`; `script-src 'self'` with the nonce and `'strict-dynamic'`; nonce `style-src`; `img-src 'self' blob: data:`; `font-src 'self'`; `connect-src 'self'`; `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`; `frame-ancestors 'none'`. The root layout uses `await connection()` so pages render per request and receive the nonce. **[Built]**
 
-Verified locally on a production build: the nonce differs on every request and matches every nonce attribute in the HTML, no enforcing header is sent, and the browser console in a clean guest window (no extensions) shows no violations. This was checked on the current placeholder page only.
+Verified locally on a production build: the nonce differs on every request and matches every nonce attribute in the HTML, no enforcing header is sent, and the browser console in a clean guest window (no extensions) shows no violations. This was checked on the current placeholder page only. With `NEXT_PUBLIC_API_URL` set, `connect-src` becomes `'self'` plus the API origin (verified on a production build with `http://localhost:4000`). The value is inlined at build time, so the production build must set it. **[Built]**
 
 Remaining before enforcement:
-1. `connect-src` allows only self. The API origin must be added when the browser client calls the backend directly. **[Planned]**
-2. Violation collection: there is no report endpoint yet, so violations are visible only in the browser console. **[Planned]**
-3. Repeat the browser check as the login and register screens and fonts land. **[Planned]**
-4. Enforced: switch to `Content-Security-Policy` once the report-only phase is clean. **[Planned]**
+1. Violation collection: there is no report endpoint yet, so violations are visible only in the browser console. **[Planned]**
+2. Repeat the browser check as the login and register screens and fonts land. **[Planned]**
+3. Enforced: switch to `Content-Security-Policy` once the report-only phase is clean. **[Planned]**
 
 Also planned: no third-party scripts without approval; a lint rule banning `dangerouslySetInnerHTML`; dependencies pinned and reviewed.
 
