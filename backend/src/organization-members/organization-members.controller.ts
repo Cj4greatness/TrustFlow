@@ -58,13 +58,11 @@ export class OrganizationMembersController {
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
     @Body() dto: UpdateMemberRoleDto,
-    @Req() req: RequestWithUser,
   ): Promise<void> {
     await this.organizationMembersService.updateMemberRole(
       organizationId,
       memberId,
       dto.role,
-      req.user.id,
     );
   }
 
@@ -94,12 +92,10 @@ export class OrganizationMembersController {
   async transferOwnership(
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Body() dto: TransferOwnershipDto,
-    @Req() req: RequestWithUser,
   ): Promise<void> {
     await this.organizationMembersService.transferOwnership(
       organizationId,
       dto.newOwnerMemberId,
-      req.user.id,
     );
   }
 

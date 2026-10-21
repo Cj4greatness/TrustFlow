@@ -1,17 +1,11 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { OrganizationMembersRepository } from './organization-members.repository';
 import { OrganizationRole } from './entities/organization-member.entity';
-import {
-  canPerformMembershipAction,
-  MembershipAction,
-  ROLE_RANK,
-} from './membership-rules';
 import { MemberResponseDto } from './dto/member-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 
@@ -21,30 +15,6 @@ export class OrganizationMembersService {
     private readonly dataSource: DataSource,
     private readonly organizationMembersRepository: OrganizationMembersRepository,
   ) {}
-
-  private async requirePermission(
-    organizationId: string,
-    actingUserId: string,
-    action: MembershipAction,
-  ) {
-    const actorMembership =
-      await this.organizationMembersRepository.findByOrganizationAndUser(
-        organizationId,
-        actingUserId,
-      );
-
-    if (!actorMembership) {
-      throw new ForbiddenException('You are not a member of this organization');
-    }
-
-    if (!canPerformMembershipAction(actorMembership.role, action)) {
-      throw new ForbiddenException(
-        `Your role (${actorMembership.role}) cannot perform this action`,
-      );
-    }
-
-    return actorMembership;
-  }
 
   async listMembers(organizationId: string): Promise<MemberResponseDto[]> {
     const members =
@@ -97,7 +67,6 @@ export class OrganizationMembersService {
     organizationId: string,
     memberId: string,
     newRole: OrganizationRole,
-    actingUserId: string,
   ): Promise<void> {
     const target = await this.organizationMembersRepository.findById(memberId);
     if (!target || target.organizationId !== organizationId) {
@@ -113,27 +82,13 @@ export class OrganizationMembersService {
       );
     }
 
-    const action =
-      ROLE_RANK[newRole] > ROLE_RANK[target.role]
-        ? MembershipAction.PROMOTE_MEMBER
-        : MembershipAction.DEMOTE_MEMBER;
-
-    await this.requirePermission(organizationId, actingUserId, action);
-
     await this.organizationMembersRepository.updateRole(memberId, newRole);
   }
 
   async transferOwnership(
     organizationId: string,
     newOwnerMemberId: string,
-    actingUserId: string,
   ): Promise<void> {
-    await this.requirePermission(
-      organizationId,
-      actingUserId,
-      MembershipAction.TRANSFER_OWNERSHIP,
-    );
-
     const currentOwner =
       await this.organizationMembersRepository.findOwner(organizationId);
     if (!currentOwner) {
