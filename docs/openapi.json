@@ -1,0 +1,6757 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "operationId": "UsersController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "summary": "Get a user by ID",
+        "tags": [
+          "users"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "summary": "Update a user's profile",
+        "tags": [
+          "users"
+        ]
+      },
+      "delete": {
+        "operationId": "UsersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "User soft-deleted"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "summary": "Soft-delete a user",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/organizations": {
+      "post": {
+        "operationId": "OrganizationsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new organization (creator becomes Owner)",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/me": {
+      "get": {
+        "operationId": "OrganizationsController_findMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List organizations the current user belongs to",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/me": {
+      "get": {
+        "operationId": "OrganizationsController_getMyMembership",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyMembershipResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a member of this organization"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller's role and permissions in this organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}": {
+      "patch": {
+        "operationId": "OrganizationsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update an organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/invitations": {
+      "post": {
+        "operationId": "InvitationsController_invite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invitation created and dispatched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invitation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found"
+          },
+          "409": {
+            "description": "A pending invitation already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invite a user to join an organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/invitations/{token}/accept": {
+      "post": {
+        "operationId": "InvitationsController_accept",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "description": "Invitation token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Invitation accepted, membership created"
+          },
+          "400": {
+            "description": "Invitation expired, already used, or revoked"
+          },
+          "409": {
+            "description": "Already a member of this organization"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept an invitation, joining the organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/invitations/{token}/reject": {
+      "post": {
+        "operationId": "InvitationsController_reject",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "description": "Invitation token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Invitation rejected"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject an invitation",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/invitations/{invitationId}": {
+      "delete": {
+        "operationId": "InvitationsController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invitationId",
+            "required": true,
+            "in": "path",
+            "description": "Invitation UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Invitation revoked"
+          },
+          "404": {
+            "description": "Invitation not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a pending invitation",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/members": {
+      "get": {
+        "operationId": "OrganizationMembersController_listMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List members of an organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/members/{memberId}": {
+      "patch": {
+        "operationId": "OrganizationMembersController_updateRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "description": "Membership UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a member's role",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "delete": {
+        "operationId": "OrganizationMembersController_removeMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "description": "Membership UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a member from the organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/members/transfer-ownership": {
+      "post": {
+        "operationId": "OrganizationMembersController_transferOwnership",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferOwnershipDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Transfer organization ownership to another member",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/members/leave": {
+      "post": {
+        "operationId": "OrganizationMembersController_leave",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Leave an organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/organizations/{id}/customers": {
+      "post": {
+        "operationId": "CustomersController_createCustomer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a customer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "get": {
+        "operationId": "CustomersController_listCustomers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "active",
+              "type": "string",
+              "enum": [
+                "lead",
+                "active",
+                "inactive",
+                "archived"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Free-text search across displayName and email",
+            "schema": {
+              "example": "chisom",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List customers in an organization",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/organizations/{id}/customers/{customerId}": {
+      "get": {
+        "operationId": "CustomersController_getCustomer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single customer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "patch": {
+        "operationId": "CustomersController_updateCustomer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a customer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomersController_deleteCustomer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete a customer",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/organizations/{id}/customers/{customerId}/addresses": {
+      "post": {
+        "operationId": "CustomerAddressesController_addAddress",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerAddressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAddress"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an address to a customer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "get": {
+        "operationId": "CustomerAddressesController_listAddresses",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerAddress"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a customer's addresses",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/organizations/{id}/customers/{customerId}/addresses/{addressId}": {
+      "patch": {
+        "operationId": "CustomerAddressesController_updateAddress",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "addressId",
+            "required": true,
+            "in": "path",
+            "description": "Address UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerAddressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAddress"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a customer address",
+        "tags": [
+          "customers"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomerAddressesController_deleteAddress",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "addressId",
+            "required": true,
+            "in": "path",
+            "description": "Address UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a customer address",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/organizations/{id}/customers/{customerId}/notes": {
+      "post": {
+        "operationId": "CustomerNotesController_addNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerNote"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a note to a customer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "get": {
+        "operationId": "CustomerNotesController_listNotes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerNote"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a customer's notes",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/organizations/{id}/products": {
+      "post": {
+        "operationId": "ProductsController_createProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a product (auto-provisions its Inventory)",
+        "tags": [
+          "products"
+        ]
+      },
+      "get": {
+        "operationId": "ProductsController_listProducts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "active",
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Free-text search across name and sku",
+            "schema": {
+              "example": "wireless",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List products in an organization",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/organizations/{id}/products/{productId}": {
+      "get": {
+        "operationId": "ProductsController_getProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single product",
+        "tags": [
+          "products"
+        ]
+      },
+      "patch": {
+        "operationId": "ProductsController_updateProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a product",
+        "tags": [
+          "products"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductsController_deleteProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete (archive-eligible) a product",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/organizations/{id}/products/{productId}/inventory": {
+      "get": {
+        "operationId": "InventoryController_getInventory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventory"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a product's current inventory",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/organizations/{id}/products/{productId}/inventory/adjustments": {
+      "post": {
+        "operationId": "InventoryController_adjustInventory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustInventoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventory"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Apply an ADD/REMOVE inventory adjustment",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/organizations/{id}/products/{productId}/inventory/movements": {
+      "get": {
+        "operationId": "InventoryController_listMovements",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a product's inventory movement history",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/organizations/{id}/suppliers": {
+      "post": {
+        "operationId": "SuppliersController_createSupplier",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a supplier",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "get": {
+        "operationId": "SuppliersController_listSuppliers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "active",
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Free-text search across name and email",
+            "schema": {
+              "example": "wholesale",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List suppliers in an organization",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/organizations/{id}/suppliers/{supplierId}": {
+      "get": {
+        "operationId": "SuppliersController_getSupplier",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single supplier",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "patch": {
+        "operationId": "SuppliersController_updateSupplier",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupplierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a supplier",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "delete": {
+        "operationId": "SuppliersController_deleteSupplier",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete a supplier",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/organizations/{id}/suppliers/{supplierId}/products": {
+      "post": {
+        "operationId": "SupplierProductsController_addProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierProduct"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Associate a product with a supplier",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "get": {
+        "operationId": "SupplierProductsController_listProducts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupplierProduct"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a supplier's associated products",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/organizations/{id}/suppliers/{supplierId}/products/{associationId}": {
+      "get": {
+        "operationId": "SupplierProductsController_getAssociation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "associationId",
+            "required": true,
+            "in": "path",
+            "description": "SupplierProduct UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierProduct"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single supplier-product association",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "patch": {
+        "operationId": "SupplierProductsController_updateAssociation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "associationId",
+            "required": true,
+            "in": "path",
+            "description": "SupplierProduct UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupplierProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierProduct"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a supplier-product association's procurement data",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "delete": {
+        "operationId": "SupplierProductsController_removeAssociation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "description": "Supplier UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "associationId",
+            "required": true,
+            "in": "path",
+            "description": "SupplierProduct UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a supplier-product association",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/organizations/{id}/orders": {
+      "post": {
+        "operationId": "OrdersController_createOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a DRAFT order",
+        "tags": [
+          "orders"
+        ]
+      },
+      "get": {
+        "operationId": "OrdersController_listOrders",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "confirmed",
+              "type": "string",
+              "enum": [
+                "draft",
+                "confirmed",
+                "processing",
+                "completed",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "Filter orders by customer",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List orders in an organization",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/orders/{orderId}": {
+      "get": {
+        "operationId": "OrdersController_getOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single order",
+        "tags": [
+          "orders"
+        ]
+      },
+      "patch": {
+        "operationId": "OrdersController_updateOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a DRAFT order",
+        "tags": [
+          "orders"
+        ]
+      },
+      "delete": {
+        "operationId": "OrdersController_deleteOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a DRAFT order (true removal, not cancellation)",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/orders/{orderId}/confirm": {
+      "post": {
+        "operationId": "OrdersController_confirmOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm an order, deducting inventory atomically",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/orders/{orderId}/process": {
+      "post": {
+        "operationId": "OrdersController_processOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Move a CONFIRMED order to PROCESSING",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/orders/{orderId}/complete": {
+      "post": {
+        "operationId": "OrdersController_completeOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark a PROCESSING order COMPLETED",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/orders/{orderId}/cancel": {
+      "post": {
+        "operationId": "OrdersController_cancelOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel an order, restoring inventory if applicable",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/orders/{orderId}/items": {
+      "post": {
+        "operationId": "OrderItemsController_addItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderItem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an item to a DRAFT order",
+        "tags": [
+          "orders"
+        ]
+      },
+      "get": {
+        "operationId": "OrderItemsController_listItems",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderItem"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List an order's items",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/orders/{orderId}/items/{itemId}": {
+      "patch": {
+        "operationId": "OrderItemsController_updateItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "description": "OrderItem UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderItem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update an item quantity on a DRAFT order",
+        "tags": [
+          "orders"
+        ]
+      },
+      "delete": {
+        "operationId": "OrderItemsController_removeItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "description": "Order UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "description": "OrderItem UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove an item from a DRAFT order",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/organizations/{id}/invoices": {
+      "get": {
+        "operationId": "InvoicesController_findAll",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Invoice"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List invoices in an organization",
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/organizations/{id}/invoices/{invoiceId}": {
+      "get": {
+        "operationId": "InvoicesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "description": "Invoice UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single invoice",
+        "tags": [
+          "invoices"
+        ]
+      },
+      "patch": {
+        "operationId": "InvoicesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "description": "Invoice UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a DRAFT invoice (notes/dueDate only)",
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/organizations/{id}/invoices/{invoiceId}/approve": {
+      "post": {
+        "operationId": "InvoicesController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "description": "Invoice UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Internally approve a DRAFT invoice",
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/organizations/{id}/invoices/{invoiceId}/issue": {
+      "post": {
+        "operationId": "InvoicesController_issue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "description": "Invoice UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue an APPROVED invoice to the customer",
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries": {
+      "get": {
+        "operationId": "DeliveriesController_findAll",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Delivery"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List deliveries in an organization",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries/{deliveryId}": {
+      "get": {
+        "operationId": "DeliveriesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "description": "Delivery UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single delivery",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries/{deliveryId}/assign": {
+      "post": {
+        "operationId": "DeliveriesController_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "description": "Delivery UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign a delivery person/courier (PENDING -> ASSIGNED)",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries/{deliveryId}/pickup": {
+      "post": {
+        "operationId": "DeliveriesController_pickup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "description": "Delivery UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark picked up (ASSIGNED -> PICKED_UP)",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries/{deliveryId}/in-transit": {
+      "post": {
+        "operationId": "DeliveriesController_inTransit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "description": "Delivery UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark in transit (PICKED_UP -> IN_TRANSIT)",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries/{deliveryId}/deliver": {
+      "post": {
+        "operationId": "DeliveriesController_deliver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "description": "Delivery UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark delivered (IN_TRANSIT -> DELIVERED)",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries/{deliveryId}/fail": {
+      "post": {
+        "operationId": "DeliveriesController_fail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "description": "Delivery UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FailDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark failed (IN_TRANSIT -> FAILED)",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/deliveries/{deliveryId}/cancel": {
+      "post": {
+        "operationId": "DeliveriesController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "description": "Delivery UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a delivery (PENDING/ASSIGNED -> CANCELLED)",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/organizations/{id}/invoices/{invoiceId}/payments": {
+      "post": {
+        "operationId": "PaymentsController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "description": "Invoice UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a manually-confirmed payment against an invoice",
+        "tags": [
+          "payments"
+        ]
+      },
+      "get": {
+        "operationId": "PaymentsController_findAll",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "description": "Invoice UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Payment"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List payments recorded against an invoice",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/organizations/{id}/invoices/{invoiceId}/payments/{paymentId}": {
+      "get": {
+        "operationId": "PaymentsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "description": "Invoice UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "description": "Payment UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single payment",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/organizations/{id}/receipt-settings": {
+      "get": {
+        "operationId": "ReceiptSettingsController_getSettings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get receipt branding settings (defaults applied if unset)",
+        "tags": [
+          "receipt-settings"
+        ]
+      },
+      "patch": {
+        "operationId": "ReceiptSettingsController_updateSettings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReceiptSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update receipt branding settings (displayName/accentColor)",
+        "tags": [
+          "receipt-settings"
+        ]
+      }
+    },
+    "/organizations/{id}/receipts": {
+      "get": {
+        "operationId": "ReceiptsController_findAll",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Receipt"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List receipts in an organization",
+        "tags": [
+          "receipts"
+        ]
+      }
+    },
+    "/organizations/{id}/receipts/{receiptId}": {
+      "get": {
+        "operationId": "ReceiptsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "receiptId",
+            "required": true,
+            "in": "path",
+            "description": "Receipt UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single receipt",
+        "tags": [
+          "receipts"
+        ]
+      }
+    },
+    "/organizations/{id}/receipts/{receiptId}/void": {
+      "post": {
+        "operationId": "ReceiptsController_void",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "receiptId",
+            "required": true,
+            "in": "path",
+            "description": "Receipt UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Void an ISSUED receipt",
+        "tags": [
+          "receipts"
+        ]
+      }
+    },
+    "/organizations/{id}/receipts/regenerate/{paymentId}": {
+      "post": {
+        "operationId": "ReceiptsController_regenerate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organization UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "description": "Payment UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Regenerate a missing receipt for a successful payment (idempotent — returns the existing receipt if one already exists)",
+        "tags": [
+          "receipts"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already in use"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Register a new account",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Log in with email and password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired refresh token"
+          }
+        },
+        "summary": "Exchange a refresh token for a new token pair",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Logged out"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Log out, revoking the current refresh token",
+        "tags": [
+          "auth"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "TrustFlow API",
+    "description": "AI-powered Business Operating System for SMBs.\n\nAuthentication: obtain an access token from POST /auth/login (or /auth/register) and send it as `Authorization: Bearer <token>`.\n\nMoney: invoices, payments and receipts use integer kobo (JSON numbers). Orders, order items and products use decimal naira strings (e.g. \"1000.00\"). See the frontend integration notes.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "Access token from POST /auth/login or /auth/register"
+      }
+    },
+    "schemas": {
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "active",
+              "invited",
+              "suspended",
+              "deactivated"
+            ],
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "lastLogin": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "email",
+          "status",
+          "emailVerified",
+          "createdAt"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Chisom"
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Johnson"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30,
+            "example": "+2348012345678"
+          },
+          "avatar": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "https://cdn.example.com/avatars/123.png"
+          }
+        }
+      },
+      "CreateOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Johnson Electronics"
+          },
+          "industry": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Electronics Retail"
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Nigeria"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Africa/Lagos"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "NGN",
+              "USD",
+              "GHS",
+              "KES",
+              "ZAR",
+              "RWF"
+            ],
+            "example": "NGN",
+            "description": "3-letter ISO currency code"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "OrganizationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "timezone": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "logo": {
+            "type": "string",
+            "nullable": true
+          },
+          "subscriptionPlan": {
+            "enum": [
+              "trial",
+              "starter",
+              "growth",
+              "enterprise"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "suspended",
+              "pending_setup",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "currency",
+          "subscriptionPlan",
+          "status",
+          "createdAt"
+        ]
+      },
+      "MyMembershipResponseDto": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "description": "Organization UUID"
+          },
+          "memberId": {
+            "type": "string",
+            "description": "Membership (OrganizationMember) UUID"
+          },
+          "userId": {
+            "type": "string",
+            "description": "The caller's user UUID"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "admin",
+              "manager",
+              "staff",
+              "viewer"
+            ],
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "organization:create",
+                "organization:update",
+                "organization:delete",
+                "organization:view",
+                "member:invite",
+                "member:remove",
+                "member:update",
+                "member:view",
+                "ownership:transfer",
+                "invoice:create",
+                "invoice:approve",
+                "invoice:read",
+                "invoice:update",
+                "invoice:issue",
+                "payment:create",
+                "payment:read",
+                "inventory:update",
+                "customer:create",
+                "customer:read",
+                "customer:update",
+                "customer:delete",
+                "customer_note:create",
+                "customer_note:read",
+                "product:create",
+                "product:read",
+                "product:update",
+                "product:delete",
+                "inventory:read",
+                "inventory:adjust",
+                "supplier:create",
+                "supplier:read",
+                "supplier:update",
+                "supplier:delete",
+                "supplier_product:manage",
+                "order:create",
+                "order:read",
+                "order:update",
+                "order:confirm",
+                "order:cancel",
+                "order:process",
+                "order:complete",
+                "receipt_settings:read",
+                "receipt_settings:update",
+                "receipt:create",
+                "receipt:read",
+                "receipt:void",
+                "receipt:regenerate",
+                "delivery:create",
+                "delivery:read",
+                "delivery:assign",
+                "delivery:transition",
+                "delivery:cancel"
+              ]
+            },
+            "description": "Every permission the server grants this role"
+          }
+        },
+        "required": [
+          "organizationId",
+          "memberId",
+          "userId",
+          "role",
+          "permissions"
+        ]
+      },
+      "UpdateOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Johnson Electronics Ltd"
+          },
+          "industry": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Electronics Retail"
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Nigeria"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Africa/Lagos"
+          },
+          "logo": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "https://cdn.example.com/logos/123.png"
+          }
+        }
+      },
+      "CreateInvitationDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "newstaff@example.com"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "admin",
+              "manager",
+              "staff",
+              "viewer"
+            ],
+            "type": "string",
+            "example": "staff"
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ]
+      },
+      "Organization": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "timezone": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "logo": {
+            "type": "string",
+            "nullable": true
+          },
+          "subscriptionPlan": {
+            "type": "string",
+            "enum": [
+              "trial",
+              "starter",
+              "growth",
+              "enterprise"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "pending_setup",
+              "cancelled"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "slug",
+          "industry",
+          "country",
+          "timezone",
+          "currency",
+          "logo",
+          "subscriptionPlan",
+          "status",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "passwordHash": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "invited",
+              "suspended",
+              "deactivated"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "lastLogin": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "refreshTokenHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hash of the current valid refresh token, enabling rotation\n(each successful refresh replaces this with a new hash) and\nrevocation (logout / suspected theft sets this to null,\ninvalidating the refresh token immediately even though the JWT\nitself hasn't expired yet). Never returned via the API."
+          },
+          "previousRefreshTokenHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hash of the refresh token that was valid immediately before the\nmost recent rotation, paired with refreshTokenRotatedAt. Lets a\nconcurrent refresh() call that lost the compare-and-swap race be\ntold \"already rotated\" instead of having its session wiped as\ntheft. Cleared on logout and fresh login/register."
+          },
+          "refreshTokenRotatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "displacedRefreshTokenHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hash of the refresh token that was valid immediately before the\nmost recent login() replaced it — paired with displacedAt.\nTrustFlow permits one active refresh-token session per user; a\nsuccessful login from another device replaces the existing\nsession rather than coexisting with it. This lets the displaced\ndevice's next refresh() attempt be told SESSION_REPLACED_BY_NEW_LOGIN\ninstead of being treated as generic token theft. Unlike\npreviousRefreshTokenHash/refreshTokenRotatedAt (a short CAS-race\ngrace window), this has no expiry — a displaced device may not\nattempt to refresh for hours or days. Cleared on logout."
+          },
+          "displacedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "passwordHash",
+          "phone",
+          "avatar",
+          "status",
+          "emailVerified",
+          "lastLogin",
+          "refreshTokenHash",
+          "previousRefreshTokenHash",
+          "refreshTokenRotatedAt",
+          "displacedRefreshTokenHash",
+          "displacedAt",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "Invitation": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "invitedEmail": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "manager",
+              "staff",
+              "viewer"
+            ]
+          },
+          "token": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "whatsapp",
+              "sms",
+              "link"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "expired",
+              "revoked"
+            ]
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "invitedBy": {
+            "type": "string"
+          },
+          "inviter": {
+            "$ref": "#/components/schemas/User"
+          },
+          "acceptedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "invitedEmail",
+          "role",
+          "token",
+          "channel",
+          "status",
+          "expiresAt",
+          "invitedBy",
+          "inviter",
+          "acceptedAt",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "MemberResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "admin",
+              "manager",
+              "staff",
+              "viewer"
+            ],
+            "type": "string"
+          },
+          "joinedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponseDto"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "joinedAt",
+          "user"
+        ]
+      },
+      "UpdateMemberRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "enum": [
+              "owner",
+              "admin",
+              "manager",
+              "staff",
+              "viewer"
+            ],
+            "type": "string",
+            "example": "manager"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "TransferOwnershipDto": {
+        "type": "object",
+        "properties": {
+          "newOwnerMemberId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The membership UUID of the member becoming Owner"
+          }
+        },
+        "required": [
+          "newOwnerMemberId"
+        ]
+      },
+      "CreateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "customerType": {
+            "enum": [
+              "individual",
+              "business"
+            ],
+            "type": "string",
+            "example": "individual"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Chisom Johnson"
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Chisom"
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Johnson"
+          },
+          "companyName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Johnson Electronics"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "example": "customer@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 50,
+            "example": "+2348012345678"
+          },
+          "status": {
+            "enum": [
+              "lead",
+              "active",
+              "inactive",
+              "archived"
+            ],
+            "type": "string",
+            "example": "lead"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "referral"
+          }
+        },
+        "required": [
+          "customerType"
+        ]
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "customerType": {
+            "enum": [
+              "individual",
+              "business"
+            ],
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "companyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "lead",
+              "active",
+              "inactive",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "The user who created this customer record. Follows the\nestablished Invitation.invitedBy/inviter convention: a bare\nuuid column for the FK value plus a separately-named @ManyToOne\nrelation (here `creator`) pointing at the same column via\n@JoinColumn, with onDelete: 'CASCADE' — mirrored exactly per\nCTO decision, closing the discrepancy raised after Step 1."
+          },
+          "creator": {
+            "$ref": "#/components/schemas/User"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "customerType",
+          "displayName",
+          "firstName",
+          "lastName",
+          "companyName",
+          "email",
+          "phone",
+          "status",
+          "source",
+          "createdBy",
+          "creator",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "customerType": {
+            "enum": [
+              "individual",
+              "business"
+            ],
+            "type": "string",
+            "example": "business"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Chisom Johnson"
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Chisom"
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Johnson"
+          },
+          "companyName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Johnson Electronics"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "example": "customer@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 50,
+            "example": "+2348012345678"
+          },
+          "status": {
+            "enum": [
+              "lead",
+              "active",
+              "inactive",
+              "archived"
+            ],
+            "type": "string",
+            "example": "active"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "referral"
+          }
+        }
+      },
+      "CreateCustomerAddressDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "billing",
+              "shipping",
+              "other"
+            ],
+            "type": "string",
+            "example": "shipping"
+          },
+          "line1": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "12 Admiralty Way"
+          },
+          "line2": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Suite 4B"
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Lekki"
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Lagos"
+          },
+          "postalCode": {
+            "type": "string",
+            "maxLength": 20,
+            "example": "106104"
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Nigeria"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "line1",
+          "city",
+          "country"
+        ]
+      },
+      "CustomerAddress": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "billing",
+              "shipping",
+              "other"
+            ],
+            "type": "string"
+          },
+          "line1": {
+            "type": "string"
+          },
+          "line2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "customerId",
+          "customer",
+          "organizationId",
+          "type",
+          "line1",
+          "line2",
+          "city",
+          "state",
+          "postalCode",
+          "country",
+          "isDefault",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateCustomerAddressDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "billing",
+              "shipping",
+              "other"
+            ],
+            "type": "string",
+            "example": "billing"
+          },
+          "line1": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "12 Admiralty Way"
+          },
+          "line2": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Suite 4B"
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Lekki"
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Lagos"
+          },
+          "postalCode": {
+            "type": "string",
+            "maxLength": 20,
+            "example": "106104"
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Nigeria"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "CreateCustomerNoteDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 5000,
+            "example": "Customer requested a call back next Tuesday about pricing."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "CustomerNote": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/User"
+          },
+          "body": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "customerId",
+          "customer",
+          "organizationId",
+          "authorId",
+          "author",
+          "body",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Wireless Mouse"
+          },
+          "description": {
+            "type": "string",
+            "example": "Ergonomic wireless mouse, 2.4GHz"
+          },
+          "sku": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "SKU-001"
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Electronics"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 50,
+            "example": "piece"
+          },
+          "sellingPrice": {
+            "type": "number",
+            "minimum": 0,
+            "example": 4500
+          },
+          "costPrice": {
+            "type": "number",
+            "minimum": 0,
+            "example": 3000
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string",
+            "example": "active"
+          }
+        },
+        "required": [
+          "name",
+          "sku",
+          "sellingPrice"
+        ]
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "sellingPrice": {
+            "type": "string"
+          },
+          "costPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "The user who created this product record. Follows the\nestablished Invitation.invitedBy/inviter and\nCustomer.createdBy/creator convention: a bare uuid column for\nthe FK value plus a separately-named @ManyToOne relation\n(here `creator`), onDelete: 'CASCADE'."
+          },
+          "creator": {
+            "$ref": "#/components/schemas/User"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "name",
+          "description",
+          "sku",
+          "category",
+          "unit",
+          "sellingPrice",
+          "costPrice",
+          "status",
+          "createdBy",
+          "creator",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Wireless Mouse (2024 Edition)"
+          },
+          "description": {
+            "type": "string",
+            "example": "Updated description"
+          },
+          "sku": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "SKU-001"
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Electronics"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 50,
+            "example": "piece"
+          },
+          "sellingPrice": {
+            "type": "number",
+            "minimum": 0,
+            "example": 4800
+          },
+          "costPrice": {
+            "type": "number",
+            "minimum": 0,
+            "example": 3200
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string",
+            "example": "archived"
+          }
+        }
+      },
+      "Inventory": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "lowStockThreshold": {
+            "type": "number",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "productId",
+          "product",
+          "quantity",
+          "lowStockThreshold",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "AdjustInventoryDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "add",
+              "remove"
+            ],
+            "type": "string",
+            "example": "add"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "example": 20,
+            "description": "Positive magnitude of the adjustment"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "New delivery from supplier"
+          }
+        },
+        "required": [
+          "type",
+          "quantity",
+          "reason"
+        ]
+      },
+      "CreateSupplierDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Lagos Wholesale Supplies Ltd"
+          },
+          "contactName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Adaeze Okonkwo"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "example": "supplier@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 50,
+            "example": "+2348012345678"
+          },
+          "address": {
+            "type": "string",
+            "example": "14 Balogun Street, Lagos Island"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Preferred supplier for electronics"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string",
+            "example": "active"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Supplier": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "name": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Follows the established Invitation.invitedBy/inviter,\nCustomer.createdBy/creator, Product.createdBy/creator\nconvention: bare uuid FK column plus a separately-named\n@ManyToOne relation, onDelete: 'CASCADE'."
+          },
+          "creator": {
+            "$ref": "#/components/schemas/User"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "name",
+          "contactName",
+          "email",
+          "phone",
+          "address",
+          "notes",
+          "status",
+          "createdBy",
+          "creator",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateSupplierDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Lagos Wholesale Supplies Ltd"
+          },
+          "contactName": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Adaeze Okonkwo"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "example": "supplier@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 50,
+            "example": "+2348012345678"
+          },
+          "address": {
+            "type": "string",
+            "example": "14 Balogun Street, Lagos Island"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Preferred supplier for electronics"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string",
+            "example": "archived"
+          }
+        }
+      },
+      "CreateSupplierProductDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the product this supplier provides"
+          },
+          "supplierSku": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "SUP-SKU-4521"
+          },
+          "unitCost": {
+            "type": "number",
+            "minimum": 0,
+            "example": 8500
+          },
+          "leadTimeDays": {
+            "type": "number",
+            "minimum": 0,
+            "example": 7
+          },
+          "minimumOrderQuantity": {
+            "type": "number",
+            "minimum": 1,
+            "example": 20
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "SupplierProduct": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "supplierId": {
+            "type": "string"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/Supplier"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "supplierSku": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitCost": {
+            "type": "string",
+            "nullable": true
+          },
+          "leadTimeDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "minimumOrderQuantity": {
+            "type": "number",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "supplierId",
+          "supplier",
+          "productId",
+          "product",
+          "supplierSku",
+          "unitCost",
+          "leadTimeDays",
+          "minimumOrderQuantity",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateSupplierProductDto": {
+        "type": "object",
+        "properties": {
+          "supplierSku": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "SUP-SKU-4521"
+          },
+          "unitCost": {
+            "type": "number",
+            "minimum": 0,
+            "example": 9000
+          },
+          "leadTimeDays": {
+            "type": "number",
+            "minimum": 0,
+            "example": 10
+          },
+          "minimumOrderQuantity": {
+            "type": "number",
+            "minimum": 1,
+            "example": 25
+          }
+        }
+      },
+      "CreateOrderDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the customer placing this order"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Rush delivery requested"
+          },
+          "shippingAddressId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the CustomerAddress to ship this order to (can also be set later while DRAFT)"
+          }
+        },
+        "required": [
+          "customerId"
+        ]
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          },
+          "shippingAddressId": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippingAddress": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAddress"
+              }
+            ]
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "confirmed",
+              "processing",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "discount": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/User"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "customerId",
+          "customer",
+          "shippingAddressId",
+          "shippingAddress",
+          "orderNumber",
+          "status",
+          "subtotal",
+          "discount",
+          "total",
+          "notes",
+          "createdBy",
+          "creator",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateOrderDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of a different customer for this order"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Updated delivery instructions"
+          },
+          "shippingAddressId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the CustomerAddress to ship this order to"
+          }
+        }
+      },
+      "CreateOrderItemDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the product being ordered"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "example": 3,
+            "description": "Quantity ordered"
+          }
+        },
+        "required": [
+          "productId",
+          "quantity"
+        ]
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "order": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "productName": {
+            "type": "string",
+            "description": "Snapshot fields — copied from Product at item-creation time,\nnever re-read from the live Product relation afterward."
+          },
+          "sku": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "orderId",
+          "order",
+          "productId",
+          "product",
+          "productName",
+          "sku",
+          "unitPrice",
+          "quantity",
+          "subtotal",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateOrderItemDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "example": 5,
+            "description": "New quantity for this item"
+          }
+        },
+        "required": [
+          "quantity"
+        ]
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "order": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "approved",
+              "issued",
+              "partially_paid",
+              "paid"
+            ],
+            "type": "string"
+          },
+          "issueDate": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "dueDate": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "discountAmount": {
+            "type": "number"
+          },
+          "taxAmount": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "amountPaid": {
+            "type": "number"
+          },
+          "amountDue": {
+            "type": "number"
+          },
+          "flaggedForReview": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/User"
+          },
+          "lineItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceLineItem"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "orderId",
+          "order",
+          "customerId",
+          "customer",
+          "invoiceNumber",
+          "status",
+          "issueDate",
+          "dueDate",
+          "subtotal",
+          "discountAmount",
+          "taxAmount",
+          "total",
+          "amountPaid",
+          "amountDue",
+          "flaggedForReview",
+          "currency",
+          "notes",
+          "createdBy",
+          "creator",
+          "lineItems",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "InvoiceLineItem": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "invoice": {
+            "$ref": "#/components/schemas/Invoice"
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true
+          },
+          "product": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Product"
+              }
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "Snapshot of the Product name/description at time of billing."
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number",
+            "description": "Minor units (kobo), via KoboTransformer. Snapshot of Product price at time of billing."
+          },
+          "lineTotal": {
+            "type": "number",
+            "description": "Minor units (kobo), via KoboTransformer. Server-calculated: quantity * unitPrice."
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "invoiceId",
+          "invoice",
+          "productId",
+          "product",
+          "description",
+          "quantity",
+          "unitPrice",
+          "lineTotal",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "dueDate": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "Delivery": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "order": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "assigned",
+              "picked_up",
+              "in_transit",
+              "delivered",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "deliveryAddressLine1": {
+            "type": "string"
+          },
+          "deliveryAddressLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryAddressCity": {
+            "type": "string"
+          },
+          "deliveryAddressState": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryAddressPostalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryAddressCountry": {
+            "type": "string"
+          },
+          "trackingReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedDeliveryPerson": {
+            "type": "string",
+            "nullable": true
+          },
+          "pickupAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "orderId",
+          "order",
+          "customerId",
+          "customer",
+          "status",
+          "deliveryAddressLine1",
+          "deliveryAddressLine2",
+          "deliveryAddressCity",
+          "deliveryAddressState",
+          "deliveryAddressPostalCode",
+          "deliveryAddressCountry",
+          "trackingReference",
+          "assignedDeliveryPerson",
+          "pickupAt",
+          "deliveredAt",
+          "failureReason",
+          "cancellationReason",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "AssignDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "assignedDeliveryPerson": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "trackingReference": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "assignedDeliveryPerson"
+        ]
+      },
+      "FailDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "failureReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "failureReason"
+        ]
+      },
+      "CancelDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "cancellationReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cancellationReason"
+        ]
+      },
+      "CreatePaymentDto": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 1
+          },
+          "providerReference": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "amount"
+        ]
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "invoice": {
+            "$ref": "#/components/schemas/Invoice"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "manual"
+            ]
+          },
+          "providerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "success",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "confirmedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmer": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              }
+            ]
+          },
+          "confirmedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/User"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "invoiceId",
+          "invoice",
+          "idempotencyKey",
+          "amount",
+          "currency",
+          "method",
+          "providerReference",
+          "status",
+          "confirmedBy",
+          "confirmer",
+          "confirmedAt",
+          "createdBy",
+          "creator",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "ReceiptSettings": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accentColor": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "displayName",
+          "accentColor",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "UpdateReceiptSettingsDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "accentColor": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        }
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "paymentId": {
+            "type": "string"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/Payment"
+          },
+          "orderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "order": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Order"
+              }
+            ]
+          },
+          "invoiceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoice": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Invoice"
+              }
+            ]
+          },
+          "customerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "customer": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Customer"
+              }
+            ]
+          },
+          "receiptNumber": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "paymentDate": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "displayNameSnapshot": {
+            "type": "string"
+          },
+          "accentColorSnapshot": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "issued",
+              "voided"
+            ],
+            "type": "string"
+          },
+          "issuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organization",
+          "paymentId",
+          "payment",
+          "orderId",
+          "order",
+          "invoiceId",
+          "invoice",
+          "customerId",
+          "customer",
+          "receiptNumber",
+          "amount",
+          "currency",
+          "paymentDate",
+          "displayNameSnapshot",
+          "accentColorSnapshot",
+          "status",
+          "issuedAt",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Chisom"
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Johnson"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "example": "chisom@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)",
+            "example": "SecurePass123",
+            "description": "Minimum 8 characters, must include uppercase, lowercase, and a number."
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30,
+            "example": "+2348012345678"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "password"
+        ]
+      },
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserResponseDto"
+          },
+          "accessToken": {
+            "type": "string",
+            "description": "Short-lived JWT (15 minutes by default). Send as `Authorization: Bearer <token>`."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Long-lived refresh token (7 days by default). Single-use: every /auth/refresh rotates it. Keep it out of JS-readable storage (the BFF holds it in a Secure HttpOnly cookie)."
+          }
+        },
+        "required": [
+          "user",
+          "accessToken",
+          "refreshToken"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "chisom@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "example": "SecurePass123"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      }
+    }
+  }
+}

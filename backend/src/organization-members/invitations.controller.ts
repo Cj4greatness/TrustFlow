@@ -21,6 +21,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { InvitationsService } from './invitations.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
+import { Invitation } from './entities/invitation.entity';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { PermissionsGuard } from '../authorization/guards/permissions.guard';
 import { Permissions } from '../authorization/decorators/permissions.decorator';
@@ -45,6 +46,7 @@ export class InvitationsController {
   @ApiResponse({
     status: 201,
     description: 'Invitation created and dispatched',
+    type: Invitation,
   })
   @ApiResponse({ status: 404, description: 'Organization not found' })
   @ApiResponse({

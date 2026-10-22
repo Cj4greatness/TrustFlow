@@ -16,6 +16,18 @@ export class AuthorizationService {
   }
 
   /**
+   * The full, ratified permission list for a role, in a stable
+   * (alphabetical) order. Exposed so the frontend can render
+   * role-aware UI from the SAME matrix the guards enforce, instead of
+   * inferring capabilities from role names. The server remains the
+   * authority: hiding a button is a UX nicety, never the security
+   * boundary.
+   */
+  permissionsFor(role: OrganizationRole): Permission[] {
+    return [...PERMISSION_MATRIX[role]].sort();
+  }
+
+  /**
    * Convenience method for checking multiple permissions at once —
    * true only if the role holds every listed permission. Not yet
    * used by any guard, but anticipates decorators that declare more

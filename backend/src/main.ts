@@ -1,8 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { buildOpenApiDocument } from './swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -36,12 +37,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('TrustFlow API')
-    .setDescription('AI-powered Business Operating System for SMBs')
-    .setVersion('0.1.0')
-    .build();
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  const swaggerDocument = buildOpenApiDocument(app);
   SwaggerModule.setup('api/docs', app, swaggerDocument);
 
   const port = process.env.PORT ?? 4000;
