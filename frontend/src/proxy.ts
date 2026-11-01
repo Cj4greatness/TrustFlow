@@ -1,14 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSecurityConfig } from "@/lib/config";
-import { apiOriginFrom, buildCsp, generateNonce } from "@/lib/security/csp";
+import {
+  apiOriginFrom,
+  buildCsp,
+  cspHeaderName,
+  generateNonce,
+} from "@/lib/security/csp";
 
 // Sets a per-request nonce and a Content-Security-Policy.
 //
-// REPORT-ONLY for now: violations show in the browser console and nothing is
-// blocked. Switching to enforcement is a one-line change after the
-// report-only phase is clean (see docs/frontend-session-design.md section 8).
+// The mode comes from CSP_MODE. "report-only" (the default while the policy is
+// being verified) shows violations in the browser console and blocks nothing;
+// "enforce" blocks them. The policy string is identical in both modes and only
+// the header name changes. Production must run in enforce mode (see
+// docs/frontend-session-design.md section 8).
 export function proxy(request: NextRequest) {
-  const { isDevelopment, apiUrl } = getSecurityConfig();
+  const { isDevelopment, apiUrl, cspMode } = getSecurityConfig();
   const nonce = generateNonce();
   const policy = buildCsp({
     nonce,
@@ -24,7 +31,7 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", policy);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.headers.set("Content-Security-Policy-Report-Only", policy);
+  response.headers.set(cspHeaderName(cspMode), policy);
   return response;
 }
 

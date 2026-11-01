@@ -1,6 +1,8 @@
 // Server-only configuration. This is the only module that reads process.env
 // for the BFF; nothing here is exposed to the browser (no NEXT_PUBLIC_ vars).
 
+import { parseCspMode, type CspMode } from "./security/csp";
+
 export type ServerConfig = {
   backendUrl: string;
   isProduction: boolean;
@@ -21,6 +23,8 @@ export function getServerConfig(): ServerConfig {
 
 export type SecurityConfig = {
   isDevelopment: boolean;
+  /** "report-only" (default) or "enforce", from CSP_MODE. */
+  cspMode: CspMode;
   /** Public API URL the browser calls directly (backend CORS). Optional until the browser client exists. */
   apiUrl: string | undefined;
 };
@@ -30,6 +34,7 @@ export type SecurityConfig = {
 export function getSecurityConfig(): SecurityConfig {
   return {
     isDevelopment: process.env.NODE_ENV === "development",
+    cspMode: parseCspMode(process.env.CSP_MODE),
     apiUrl: process.env.NEXT_PUBLIC_API_URL || undefined,
   };
 }

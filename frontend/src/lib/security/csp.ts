@@ -65,3 +65,23 @@ export function buildCsp({ nonce, apiOrigin, isDevelopment }: CspOptions) {
     .map(([name, values]) => `${name} ${values.join(" ")}`)
     .join("; ");
 }
+
+export type CspMode = "report-only" | "enforce";
+
+/**
+ * Reads CSP_MODE. Unset or empty keeps the default, report-only. Any other
+ * value is treated as enforce, so a typo can only make the policy stricter,
+ * never silently weaker.
+ */
+export function parseCspMode(value: string | null | undefined): CspMode {
+  const mode = value?.trim().toLowerCase();
+  if (!mode || mode === "report-only") return "report-only";
+  return "enforce";
+}
+
+/** Report-only mode reports violations; enforce mode blocks them. */
+export function cspHeaderName(mode: CspMode): string {
+  return mode === "enforce"
+    ? "Content-Security-Policy"
+    : "Content-Security-Policy-Report-Only";
+}
