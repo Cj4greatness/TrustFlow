@@ -9,8 +9,8 @@ import { User } from '../../users/entities/user.entity';
  * Append-only by design for Sprint 4: no update/delete endpoints
  * will be built against this table, keeping the audit trail honest.
  * (If editable notes are ever needed, that should be a deliberate
- * later decision, not an oversight — mirroring how membership-rules
- * exceptions are documented rather than silently introduced.)
+ * later decision, not an oversight — exceptions to a locked pattern
+ * are documented rather than silently introduced.)
  *
  * organizationId is denormalized for the same reason as on
  * CustomerAddress: it keeps the tenant-isolation check on this
