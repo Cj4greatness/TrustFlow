@@ -24,10 +24,10 @@ The browser keeps the access token in memory only. The refresh token lives only 
 ## 3. Token lifecycle
 
 1. Sign-in: the browser POSTs credentials to `/api/auth/login`. The BFF calls the backend, sets the cookie, and returns `{ accessToken, user }` only. **[Verified live]**
-2. Page load: the app calls `/api/auth/refresh`. If the cookie exists the session is restored; if not, the BFF answers 401 `NO_SESSION` without calling the backend. **[Built; bootstrap UI planned]**
+2. Page load: the app calls `/api/auth/refresh`. If the cookie exists the session is restored; if not, the BFF answers 401 `NO_SESSION` without calling the backend. `AuthProvider` runs this once on load. "Nobody is signed in" is a quiet outcome and shows no message; a network or server error leaves the state "unavailable" with a retry and is never treated as signed out. **[Built; verified in the browser]**
 3. Data requests: the API client sends the in-memory access token. On a 401 it refreshes once and replays the request once; a 401 means the handler never ran, so the replay cannot duplicate a write. A second 401 is surfaced. **[Built]**
 4. Concurrent refreshes in one tab share a single in-flight promise. **[Built]**
-5. Across tabs, refreshes run one at a time through the Web Locks API (lock `trustflow-session-refresh`). Where Web Locks is unavailable the refresh runs directly and the rotation retry below is the fallback. **[Built; wiring into the browser bootstrap planned]**
+5. Across tabs, refreshes run one at a time through the Web Locks API (lock `trustflow-session-refresh`). Where Web Locks is unavailable the refresh runs directly and the rotation retry below is the fallback. The lock is wired in `src/lib/auth/browser.ts` with `createCrossTabLock(browserLockManager())`. **[Built]**
 6. `REFRESH_TOKEN_RECENTLY_ROTATED` is non-destructive: wait 400 ms and retry, then wait 1200 ms and retry once more. If it is still rotated, the error is surfaced and the session is left untouched. No loop. **[Built; replay verified live]**
 7. `SESSION_REPLACED_BY_NEW_LOGIN` ends the session and shows the dedicated message. Any other refresh 401 ends the session as expired. **[Built]**
 8. Network errors and 5xx never end the session and are never retried: the outcome is unknown. **[Built]**
@@ -52,7 +52,7 @@ Stateless, so it works across instances. Every BFF POST needs the `X-TrustFlow-C
 
 ## 6. Logout
 
-The client refreshes first to obtain a fresh access token, then calls `/api/auth/logout` with it. The BFF forwards the bearer token to the backend `POST /auth/logout`, always clears the cookie, and returns `{ backendSessionEnded }` honestly. No backend change is needed, and the earlier request to allow logout with a refresh token is withdrawn. **[BFF verified live; client refresh-then-logout planned]**
+The client refreshes first to obtain a fresh access token, then calls `/api/auth/logout` with it. The BFF forwards the bearer token to the backend `POST /auth/logout`, always clears the cookie, and returns `{ backendSessionEnded }` honestly. No backend change is needed, and the earlier request to allow logout with a refresh token is withdrawn. If that refresh fails, the client logs out with the access token it already holds. If the logout request cannot reach the server, the cookie was not cleared, so the screen says the person may still be signed in. The local session is cleared either way. **[Built; refresh then logout verified in the browser]**
 
 ## 7. Proxy restrictions
 
@@ -70,7 +70,7 @@ Verified locally on a production build: the nonce differs on every request and m
 
 Remaining before enforcement:
 1. Violation collection: there is no report endpoint yet, so violations are visible only in the browser console. **[Planned]**
-2. Repeat the browser check as the login and register screens and fonts land. **[Planned]**
+2. Repeat the browser check as new screens land. Done once on a production build for `/`, `/login` and `/register` (headers) and the `/login` console, which showed only the expected anonymous refresh 401. **[Ongoing]**
 3. Enforced: switch to `Content-Security-Policy` once the report-only phase is clean. **[Planned]**
 
 Also planned: no third-party scripts without approval; a lint rule banning `dangerouslySetInnerHTML`; dependencies pinned and reviewed.
@@ -103,7 +103,10 @@ The backend throttles login per client IP. Behind the BFF every user arrives fro
 - Refresh: 200 with a rotated cookie. Replay of the old cookie: 401 `REFRESH_TOKEN_RECENTLY_ROTATED`, no `Set-Cookie`.
 - Logout: `{"backendSessionEnded":true}` and a `Max-Age=0` cookie. Refresh afterwards: 401 `NO_SESSION`.
 - CSP (report-only), production build on port 3002: the `Content-Security-Policy-Report-Only` nonce differed between two requests and matched every nonce attribute in the HTML (13 of 13, no script tag without a nonce); no enforcing `Content-Security-Policy` header was sent; a clean browser guest window showed an empty console and no issues. Checked on the placeholder page only.
-- Automated: 97 frontend tests passing, `tsc`, lint and build clean. The reviewer has not yet seen the frontend code, because the branch is not on the remote.
+- Browser auth (development server): login returns 200 and redirects to `/`; sign-out calls refresh (200) and then logout (200) and lands on `/login` with no expiry notice; registering an existing email shows the conflict message on the email field.
+- Register through the BFF: 201, `tf_refresh` cookie (`HttpOnly; SameSite=strict; Path=/api/auth`, no `Secure` on the development server), body keys `accessToken` and `user` only, so registration signs the user in.
+- Production build with the login and register screens: `/`, `/login` and `/register` return 200; nonces match on every page (no script tag without a nonce); no enforcing CSP header; `connect-src 'self'` plus the API origin; `font-src 'self'`. The `/login` console in a clean guest window shows only the anonymous refresh 401 and no CSP violations. The `/register` console was not separately inspected.
+- Automated: 145 frontend tests passing, `tsc`, lint and build clean. The reviewer has not yet seen the frontend code, because the branch is not on the remote.
 
 ## 14. Decisions requested
 
