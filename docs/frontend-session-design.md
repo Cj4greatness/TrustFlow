@@ -1,8 +1,8 @@
 # Frontend Session Design
 
-Status: DRAFT v2 for CTO approval (decision D1). Revised after senior review (approve with conditions).
+Status: v3, approved with conditions by the CTO (decisions recorded 2026-11-01, see section 14). A final security review is still required before production. Revised after senior review (approve with conditions).
 Verified 2026-10-17 against a local backend built from `develop` at 11158814.
-Legend: **[Built]** implemented and tested. **[Verified live]** also exercised against the running backend. **[Planned]** not built. **[Open]** needs a decision.
+Legend: **[Built]** implemented and tested. **[Verified live]** also exercised against the running backend. **[Planned]** not built. **[Open]** needs a decision. **[Required]** decided by the CTO, not built yet.
 
 ## 1. Summary
 
@@ -62,7 +62,7 @@ The BFF is not a proxy. It exposes exactly four routes: `login`, `register`, `re
 
 Because the browser holds the access token, an XSS bug could read it. Mitigations in place: token in memory only and never in localStorage, sessionStorage or IndexedDB **[Built]**; 15-minute lifetime **[backend]**; refresh token unreachable from JavaScript **[Built]**.
 
-Content-Security-Policy is built in **report-only mode**. Enforcement is not yet built and remains a production requirement.
+Content-Security-Policy is built in **report-only mode**. Enforcement is a production requirement (CTO, 2026-11-01): the app must not ship with CSP in report-only mode, and enforcement is not built yet.
 
 Phase 1, report-only, is built: `src/proxy.ts` sets a per-request nonce policy, delivered as `Content-Security-Policy-Report-Only`: `default-src 'self'`; `script-src 'self'` with the nonce and `'strict-dynamic'`; nonce `style-src`; `img-src 'self' blob: data:`; `font-src 'self'`; `connect-src 'self'`; `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`; `frame-ancestors 'none'`. The root layout uses `await connection()` so pages render per request and receive the nonce. **[Built]**
 
@@ -71,30 +71,31 @@ Verified locally on a production build: the nonce differs on every request and m
 Remaining before enforcement:
 1. Violation collection: there is no report endpoint yet, so violations are visible only in the browser console. **[Planned]**
 2. Repeat the browser check as new screens land. Done once on a production build for `/`, `/login` and `/register` (headers) and the `/login` console, which showed only the expected anonymous refresh 401. **[Ongoing]**
-3. Enforced: switch to `Content-Security-Policy` once the report-only phase is clean. **[Planned]**
+3. Enforce: resolve all report-only violations, verify nonce handling across the app, and test sign-in, registration, refresh, sign-out and the authenticated application under the enforced policy, then switch to `Content-Security-Policy`. **[Required, not built]**
 
 Also planned: no third-party scripts without approval; a lint rule banning `dangerouslySetInnerHTML`; dependencies pinned and reviewed.
 
-## 9. Lost refresh response (accepted v1 risk, pending approval)
+## 9. Lost refresh response (accepted v1 risk, with mitigations)
 
-Refresh rotates the token on every page load. If a refresh response is lost on an unreliable network, the browser keeps the old cookie. After the backend's rotation window (about 10 seconds) the old token counts as reuse and the backend ends the session. The BFF cannot prevent this. For v1 we propose to accept it, with a clear "you were signed out, please sign in again" message and logging of how often it happens so the risk can be measured. **[Open: CTO to accept]**
+Refresh rotates the token on every page load. If a refresh response is lost on an unreliable network, the browser keeps the old cookie. After the backend's rotation window (about 10 seconds) the old token counts as reuse and the backend ends the session. The BFF cannot prevent this. For v1 we propose to accept it, with a clear "you were signed out, please sign in again" message and logging of how often it happens so the risk can be measured. The CTO accepted this for v1 on 2026-11-01 on three conditions: the refresh-token reuse handling is documented and tested; the user gets a clear recovery message; the event is logged without exposing tokens or other secrets, and its frequency is tracked after launch. **[Accepted]** The reuse handling and the bounded retry are built and tested (section 3), and the expiry notice that asks the person to sign in again is built. A message specific to this case and the event logging are **[Required, not built]**.
 
 ## 10. Session lifetime
 
-Refresh is sliding: a session lasts indefinitely while the user keeps using the app, because each refresh issues a new 7-day token. An absolute maximum would need a backend change. **[Open: sliding for v1, or an absolute cap and its value]**
+Decided (CTO, 2026-11-01): sliding 7-day sessions with a 30-day absolute maximum. Each refresh issues a new 7-day token, so activity extends the session, but never beyond 30 days from the initial sign-in; after that the user must sign in again. The backend has to enforce the limit: it must keep the original sign-in time for each session and refuse refreshes after 30 days. The frontend cannot enforce it, because the BFF holds no state. The existing handling (any refresh 401 ends the session as expired) already covers the frontend side. **[Decided]** Backend enforcement: **[Required, not built]**
 
 ## 11. Horizontal scaling and deployment (Cloud Run direction)
 
 The BFF keeps no state: no sessions, no in-memory guards that correctness depends on. Across instances, the backend's compare-and-swap rotation, the retries and the cross-tab lock are the safety net. Checklist before production **[Open]**:
 - Serve over HTTPS so the `Secure` cookie is on.
 - Set `BACKEND_URL` (server) and the browser API URL.
-- Add the frontend origin to the backend `CORS_ALLOWED_ORIGINS` (never `*`).
+- Add the frontend origin to the backend `CORS_ALLOWED_ORIGINS`: an explicit allowlist, never `*`, and only the methods and headers the app needs.
 - Run as a Next.js server container, not a static export.
 - Verify the proxy hop count on the real platform.
+- Verify the CORS and trusted-proxy configuration in the actual deployment before enabling production authentication (CTO release condition).
 
 ## 12. Open issue: login throttle behind the BFF
 
-The backend throttles login per client IP. Behind the BFF every user arrives from the BFF's address, so one bucket serves everyone (tested: the 6th login from one IP gets a 429 for 900 s). A fixed trust-proxy hop count alone is unsafe for a public API, because a direct caller could forge `X-Forwarded-For` and choose its own limiter key. The reviewer recommends `trust proxy = 1` plus the BFF sending the user's IP with a shared secret that the backend verifies before honouring it. This is a backend security-control change and needs CTO approval. **[Open]** BFF login and register must not go to production until it is decided and built. Refresh and logout are unaffected. The BFF side (reading the client IP and sending it with the secret) is built only after approval.
+The backend throttles login per client IP. Behind the BFF every user arrives from the BFF's address, so one bucket serves everyone (tested: the 6th login from one IP gets a 429 for 900 s). A fixed trust-proxy hop count alone is unsafe for a public API, because a direct caller could forge `X-Forwarded-For` and choose its own limiter key. The reviewer recommends `trust proxy = 1` plus the BFF sending the user's IP with a shared secret that the backend verifies before honouring it. This is a backend security-control change and needs CTO approval. **[Approved with conditions, not built]** The CTO approved this only after the deployment topology is verified: trust only the known BFF or proxy hop, prevent clients from spoofing forwarded-IP headers, and verify that login throttling uses the actual client IP. It must not be enabled blindly in production. BFF login and register must not go to production until it is built and verified in the real deployment. Refresh and logout are unaffected. The BFF side (reading the client IP and sending it with the secret) is not built yet; it follows the topology check.
 
 ## 13. Evidence (local)
 
@@ -108,10 +109,22 @@ The backend throttles login per client IP. Behind the BFF every user arrives fro
 - Production build with the login and register screens: `/`, `/login` and `/register` return 200; nonces match on every page (no script tag without a nonce); no enforcing CSP header; `connect-src 'self'` plus the API origin; `font-src 'self'`. The `/login` console in a clean guest window shows only the anonymous refresh 401 and no CSP violations. The `/register` console was not separately inspected.
 - Automated: 145 frontend tests passing, `tsc`, lint and build clean. The branch is on the remote as `feature/frontend-foundation` for review.
 
-## 14. Decisions requested
+## 14. Decisions (CTO, recorded 2026-11-01)
 
-1. Approve this session design, with the conditions above.
-2. Approve authenticated client-IP forwarding with `trust proxy = 1` (section 12).
-3. Sliding 7-day sessions for v1, or an absolute maximum and its value (section 10).
-4. Accept the lost-refresh-response risk for v1 (section 9).
-5. Approve the CSP plan as a production requirement (section 8).
+1. Session design: **approved**, subject to a final security review before production.
+2. Client-IP forwarding with `trust proxy = 1` (section 12): **approved with conditions**. Only after the deployment topology is verified; trust only the known BFF or proxy hop; prevent spoofed forwarded-IP headers; verify that login throttling uses the actual client IP; never enable blindly in production.
+3. Session lifetime (section 10): **sliding 7-day with a 30-day absolute maximum** from initial authentication; reauthentication is required after the limit.
+4. Lost refresh response (section 9): **accepted for v1 with mitigation**: reuse handling documented and tested, a clear recovery message, event logging without tokens or secrets, and frequency tracked after launch.
+5. CSP (section 8): **required for production**. Resolve all report-only violations, verify nonce handling across the app, and test sign-in, registration, refresh, sign-out and the authenticated application under the enforced policy. Do not ship in report-only mode.
+
+CORS: keep the backend implementation that supports this architecture. Browser requests go directly to the backend, with an explicit `CORS_ALLOWED_ORIGINS` allowlist, only the required methods and headers, and no wildcard origin. The BFF stays limited to the four auth routes; there is no Next.js API proxy.
+
+Branding: the maroon is temporary until the palette and logo are finalized.
+
+Release condition: decisions 1 to 5 are documented, the required security checks pass, and the CORS and trusted-proxy configurations are verified in the real deployment before production authentication is enabled.
+
+Work still to build:
+- Backend: the absolute 30-day session limit (section 10).
+- BFF: client-IP forwarding with the shared secret, after the topology check (section 12).
+- Frontend: a CSP enforcement switch and the enforced-policy test pass (section 8); event logging for lost refresh responses and a message specific to that case (section 9).
+- Deployment: verify the CORS and trusted-proxy configuration in the real environment (section 11).
