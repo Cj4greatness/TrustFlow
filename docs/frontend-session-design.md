@@ -106,7 +106,7 @@ The backend throttles login per client IP. Behind the BFF every user arrives fro
 - Browser auth (development server): login returns 200 and redirects to `/`; sign-out calls refresh (200) and then logout (200) and lands on `/login` with no expiry notice; registering an existing email shows the conflict message on the email field.
 - Register through the BFF: 201, `tf_refresh` cookie (`HttpOnly; SameSite=strict; Path=/api/auth`, no `Secure` on the development server), body keys `accessToken` and `user` only, so registration signs the user in.
 - Production build with the login and register screens: `/`, `/login` and `/register` return 200; nonces match on every page (no script tag without a nonce); no enforcing CSP header; `connect-src 'self'` plus the API origin; `font-src 'self'`. The `/login` console in a clean guest window shows only the anonymous refresh 401 and no CSP violations. The `/register` console was not separately inspected.
-- Automated: 145 frontend tests passing, `tsc`, lint and build clean. The reviewer has not yet seen the frontend code, because the branch is not on the remote.
+- Automated: 145 frontend tests passing, `tsc`, lint and build clean. The branch is on the remote as `feature/frontend-foundation` for review.
 
 ## 14. Decisions requested
 
