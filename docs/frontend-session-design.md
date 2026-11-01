@@ -62,7 +62,7 @@ The BFF is not a proxy. It exposes exactly four routes: `login`, `register`, `re
 
 Because the browser holds the access token, an XSS bug could read it. Mitigations in place: token in memory only and never in localStorage, sessionStorage or IndexedDB **[Built]**; 15-minute lifetime **[backend]**; refresh token unreachable from JavaScript **[Built]**.
 
-Content-Security-Policy is built in **report-only mode**. Enforcement is a production requirement (CTO, 2026-11-01): the app must not ship with CSP in report-only mode, and enforcement is not built yet.
+Content-Security-Policy is built in **report-only mode**. Enforcement is a production requirement (CTO, 2026-11-01): the app must not ship with CSP in report-only mode. The enforcement switch is built: `CSP_MODE=enforce` sends the same policy as `Content-Security-Policy`. The default is report-only, so production must set `CSP_MODE=enforce` explicitly.
 
 Phase 1, report-only, is built: `src/proxy.ts` sets a per-request nonce policy, delivered as `Content-Security-Policy-Report-Only`: `default-src 'self'`; `script-src 'self'` with the nonce and `'strict-dynamic'`; nonce `style-src`; `img-src 'self' blob: data:`; `font-src 'self'`; `connect-src 'self'`; `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`; `frame-ancestors 'none'`. The root layout uses `await connection()` so pages render per request and receive the nonce. **[Built]**
 
@@ -71,7 +71,7 @@ Verified locally on a production build: the nonce differs on every request and m
 Remaining before enforcement:
 1. Violation collection: there is no report endpoint yet, so violations are visible only in the browser console. **[Planned]**
 2. Repeat the browser check as new screens land. Done once on a production build for `/`, `/login` and `/register` (headers) and the `/login` console, which showed only the expected anonymous refresh 401. **[Ongoing]**
-3. Enforce: resolve all report-only violations, verify nonce handling across the app, and test sign-in, registration, refresh, sign-out and the authenticated application under the enforced policy, then switch to `Content-Security-Policy`. **[Required, not built]**
+3. Enforce. The switch is built and tested on a production build with the current screens: nonces match on every page, no CSP violation appeared in a clean guest window, and a signed-in session, its restore on reload and sign-out all worked under the enforced policy. Still required: repeat the pass for every new screen and for the authenticated application as it is built, review violations collected under item 1, and set `CSP_MODE=enforce` in production. **[Built; enforced pass done for the current screens]**
 
 Also planned: no third-party scripts without approval; a lint rule banning `dangerouslySetInnerHTML`; dependencies pinned and reviewed.
 
@@ -87,6 +87,7 @@ Decided (CTO, 2026-11-01): sliding 7-day sessions with a 30-day absolute maximum
 
 The BFF keeps no state: no sessions, no in-memory guards that correctness depends on. Across instances, the backend's compare-and-swap rotation, the retries and the cross-tab lock are the safety net. Checklist before production **[Open]**:
 - Serve over HTTPS so the `Secure` cookie is on.
+- Set `CSP_MODE=enforce`; the default is report-only.
 - Set `BACKEND_URL` (server) and the browser API URL.
 - Add the frontend origin to the backend `CORS_ALLOWED_ORIGINS`: an explicit allowlist, never `*`, and only the methods and headers the app needs.
 - Run as a Next.js server container, not a static export.
@@ -95,7 +96,7 @@ The BFF keeps no state: no sessions, no in-memory guards that correctness depend
 
 ## 12. Open issue: login throttle behind the BFF
 
-The backend throttles login per client IP. Behind the BFF every user arrives from the BFF's address, so one bucket serves everyone (tested: the 6th login from one IP gets a 429 for 900 s). A fixed trust-proxy hop count alone is unsafe for a public API, because a direct caller could forge `X-Forwarded-For` and choose its own limiter key. The reviewer recommends `trust proxy = 1` plus the BFF sending the user's IP with a shared secret that the backend verifies before honouring it. This is a backend security-control change and needs CTO approval. **[Approved with conditions, not built]** The CTO approved this only after the deployment topology is verified: trust only the known BFF or proxy hop, prevent clients from spoofing forwarded-IP headers, and verify that login throttling uses the actual client IP. It must not be enabled blindly in production. BFF login and register must not go to production until it is built and verified in the real deployment. Refresh and logout are unaffected. The BFF side (reading the client IP and sending it with the secret) is not built yet; it follows the topology check.
+The backend throttles login per client IP. Behind the BFF every user arrives from the BFF's address, so one bucket serves everyone (tested: the 6th login from one IP gets a 429 for 900 s). The same showed in the browser on a production build: five rejected logins followed by a 429, which blocks sign-in for every user behind the BFF's address. A fixed trust-proxy hop count alone is unsafe for a public API, because a direct caller could forge `X-Forwarded-For` and choose its own limiter key. The reviewer recommends `trust proxy = 1` plus the BFF sending the user's IP with a shared secret that the backend verifies before honouring it. This is a backend security-control change and needs CTO approval. **[Approved with conditions, not built]** The CTO approved this only after the deployment topology is verified: trust only the known BFF or proxy hop, prevent clients from spoofing forwarded-IP headers, and verify that login throttling uses the actual client IP. It must not be enabled blindly in production. BFF login and register must not go to production until it is built and verified in the real deployment. Refresh and logout are unaffected. The BFF side (reading the client IP and sending it with the secret) is not built yet; it follows the topology check.
 
 ## 13. Evidence (local)
 
@@ -107,7 +108,8 @@ The backend throttles login per client IP. Behind the BFF every user arrives fro
 - Browser auth (development server): login returns 200 and redirects to `/`; sign-out calls refresh (200) and then logout (200) and lands on `/login` with no expiry notice; registering an existing email shows the conflict message on the email field.
 - Register through the BFF: 201, `tf_refresh` cookie (`HttpOnly; SameSite=strict; Path=/api/auth`, no `Secure` on the development server), body keys `accessToken` and `user` only, so registration signs the user in.
 - Production build with the login and register screens: `/`, `/login` and `/register` return 200; nonces match on every page (no script tag without a nonce); no enforcing CSP header; `connect-src 'self'` plus the API origin; `font-src 'self'`. The `/login` console in a clean guest window shows only the anonymous refresh 401 and no CSP violations. The `/register` console was not separately inspected.
-- Automated: 145 frontend tests passing, `tsc`, lint and build clean. The branch is on the remote as `feature/frontend-foundation` for review.
+- Enforced CSP (`CSP_MODE=enforce`, production build): `/`, `/login` and `/register` send only the enforcing `Content-Security-Policy` header; nonces match on every page and no script tag lacks one. In a clean guest window the console showed no CSP violations ("No issues"), the pages rendered styled, and a signed-in session was established, restored on reload and ended by sign-out. Login-form success under enforcement was not separately confirmed: five login attempts were rejected and then throttled with a 429.
+- Automated: 150 frontend tests passing, `tsc`, lint and build clean. The branch is on the remote as `feature/frontend-foundation` for review.
 
 ## 14. Decisions (CTO, recorded 2026-11-01)
 
