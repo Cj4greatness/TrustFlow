@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_ERROR_CODES } from "../../api/errors";
 import { getServerConfig } from "../config";
+import { classifyRefreshFailure, logAuthEvent } from "./auth-log";
 import { callBackend } from "./backend";
 import {
   forwardedRateLimitHeaders,
@@ -107,7 +108,10 @@ export async function handleRefresh(
   const result = await callBackend("/auth/refresh", {
     body: { refreshToken },
   });
-  if (!result) return unreachable();
+  if (!result) {
+    logAuthEvent({ event: "refresh_backend_unreachable" });
+    return unreachable();
+  }
 
   if (!result.ok) {
     const response = errorJson(
@@ -117,6 +121,11 @@ export async function handleRefresh(
     );
     const code = sanitizeErrorBody(result.status, result.body).details?.code;
     const lostRace = code === AUTH_ERROR_CODES.REFRESH_TOKEN_RECENTLY_ROTATED;
+    logAuthEvent({
+      event: classifyRefreshFailure(result.status, code),
+      status: result.status,
+      code,
+    });
     // Only a definitive "this session is dead" clears the cookie. Losing a
     // rotation race, throttling, or a server error must leave it alone.
     if (result.status === 401 && !lostRace) {
@@ -130,7 +139,13 @@ export async function handleRefresh(
   }
 
   const parsed = splitAuthResponse(result.body);
-  if (!parsed) return unreachable();
+  if (!parsed) {
+    logAuthEvent({
+      event: "refresh_invalid_backend_response",
+      status: result.status,
+    });
+    return unreachable();
+  }
   return sessionResponse(parsed, 200, isProduction);
 }
 
