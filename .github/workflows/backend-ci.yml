@@ -71,13 +71,20 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
+        with:
+          package_json_file: backend/package.json
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
           cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Verify toolchain versions
+        run: |
+          test "$(node -v)" = "v$(cat ../.nvmrc)" || { echo "Node mismatch: $(node -v)"; exit 1; }
+          test "$(pnpm -v)" = "9.15.9" || { echo "pnpm mismatch: $(pnpm -v)"; exit 1; }
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
