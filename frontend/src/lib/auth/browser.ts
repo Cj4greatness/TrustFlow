@@ -12,9 +12,9 @@ import {
   createCrossTabLock,
   type LockManagerLike,
 } from "./cross-tab-lock";
-import type { SessionEndReason } from "./session-manager";
+import type { SessionNotice } from "./auth-state";
 
-export type SessionEndListener = (reason: SessionEndReason) => void;
+export type SessionEndListener = (reason: SessionNotice) => void;
 
 export type BrowserAuthOptions = {
   /** Public API origin the browser calls directly, e.g. http://localhost:4000 */

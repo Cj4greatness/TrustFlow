@@ -22,7 +22,8 @@ import {
 } from "../../api/errors";
 import type { RunExclusive } from "./cross-tab-lock";
 import { CSRF_HEADER, CSRF_HEADER_VALUE } from "./csrf";
-import { createSessionManager, type SessionEndReason } from "./session-manager";
+import type { SessionNotice } from "./auth-state";
+import { createSessionManager } from "./session-manager";
 import type { Session } from "./types";
 
 export type Credentials = { email: string; password: string };
@@ -31,7 +32,7 @@ export type RegisterInput = Record<string, unknown>;
 
 export type AuthClientOptions = {
   /** Called when a session that existed has ended (expired or replaced). */
-  onSessionEnded: (reason: SessionEndReason) => void;
+  onSessionEnded: (reason: SessionNotice) => void;
   fetchFn?: typeof fetch;
   runExclusive?: RunExclusive;
   wait?: (ms: number) => Promise<void>;
@@ -74,6 +75,9 @@ export function createAuthClient(options: AuthClientOptions) {
     options.fetchFn ?? ((input, init) => fetch(input, init));
   let hadSession = false;
   let signingOut = false;
+  // True after a refresh that got no answer or a server error: the backend may
+  // have rotated the token while the response was lost. Lives in this tab only.
+  let unknownRefreshOutcome = false;
 
   async function post(
     route: string,
@@ -126,14 +130,27 @@ export function createAuthClient(options: AuthClientOptions) {
 
   const manager = createSessionManager({
     callRefresh: async () => {
-      const session = await postForSession("refresh");
-      hadSession = true;
-      return session;
+      try {
+        const session = await postForSession("refresh");
+        hadSession = true;
+        unknownRefreshOutcome = false;
+        return session;
+      } catch (error) {
+        if (
+          isApiError(error) &&
+          (error.kind === "network" || error.kind === "server")
+        ) {
+          unknownRefreshOutcome = true;
+        }
+        throw error;
+      }
     },
     onEnded: (reason) => {
       const quiet = signingOut || (reason === "expired" && !hadSession);
+      const interrupted = reason === "expired" && unknownRefreshOutcome;
       hadSession = false;
-      if (!quiet) options.onSessionEnded(reason);
+      unknownRefreshOutcome = false;
+      if (!quiet) options.onSessionEnded(interrupted ? "interrupted" : reason);
     },
     wait: options.wait,
     rotatedRetryDelaysMs: options.rotatedRetryDelaysMs,
@@ -186,6 +203,7 @@ export function createAuthClient(options: AuthClientOptions) {
       } finally {
         manager.clear();
         hadSession = false;
+        unknownRefreshOutcome = false;
         signingOut = false;
       }
     },

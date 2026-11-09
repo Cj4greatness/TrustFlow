@@ -12,7 +12,14 @@
 import type { SessionEndReason } from "./session-manager";
 import type { Session, SessionUser } from "./types";
 
-export type AuthNotice = SessionEndReason | null;
+/**
+ * Why a session ended, as shown to the person. "interrupted" is an expiry
+ * that followed a refresh whose outcome was unknown (no answer, or a server
+ * error), so the person may have been signed out through no fault of their own.
+ */
+export type SessionNotice = SessionEndReason | "interrupted";
+
+export type AuthNotice = SessionNotice | null;
 
 export type AuthState =
   | { status: "loading"; user: null; notice: null }
@@ -26,7 +33,7 @@ export type AuthAction =
   | { type: "bootstrapRetried" }
   | { type: "signedIn"; session: Session }
   | { type: "signedOut" }
-  | { type: "sessionEnded"; reason: SessionEndReason }
+  | { type: "sessionEnded"; reason: SessionNotice }
   | { type: "noticeDismissed" };
 
 export const initialAuthState: AuthState = {
@@ -72,10 +79,15 @@ export function authReducer(state: AuthState, action: AuthAction): AuthState {
   }
 }
 
-export function describeSessionNotice(reason: SessionEndReason): string {
-  return reason === "replaced"
-    ? "You were signed out because your account was signed in on another device."
-    : "Your session has expired. Please sign in again.";
+export function describeSessionNotice(reason: SessionNotice): string {
+  switch (reason) {
+    case "replaced":
+      return "You were signed out because your account was signed in on another device.";
+    case "interrupted":
+      return "Your connection dropped while your session was being renewed, so you may have been signed out. Please sign in again.";
+    case "expired":
+      return "Your session has expired. Please sign in again.";
+  }
 }
 
 /** Route guards render protected content only when this is true. */
