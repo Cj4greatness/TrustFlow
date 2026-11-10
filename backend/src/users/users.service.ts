@@ -92,7 +92,7 @@ export class UsersService {
 
   async softDelete(id: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      const user = await this.usersRepository.findById(id, manager);
+      const user = await this.usersRepository.findByIdForUpdate(id, manager);
       if (!user) {
         throw new NotFoundException('User not found');
       }

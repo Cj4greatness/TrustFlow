@@ -30,6 +30,13 @@ export class UsersRepository {
     return repository.findOne({ where: { id } });
   }
 
+  findByIdForUpdate(id: string, manager: EntityManager): Promise<User | null> {
+    return manager.getRepository(User).findOne({
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
   findByEmail(email: string): Promise<User | null> {
     return this.repository.findOne({ where: { email } });
   }
