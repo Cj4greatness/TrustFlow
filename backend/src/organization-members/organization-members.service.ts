@@ -8,6 +8,7 @@ import { OrganizationMembersRepository } from './organization-members.repository
 import { OrganizationRole } from './entities/organization-member.entity';
 import { MemberResponseDto } from './dto/member-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
+import { UserStatus } from '../users/entities/user.entity';
 
 @Injectable()
 export class OrganizationMembersService {
@@ -47,20 +48,48 @@ export class OrganizationMembersService {
   async removeMember(
     organizationId: string,
     memberIdToRemove: string,
+    actorUserId: string,
   ): Promise<void> {
-    const target =
-      await this.organizationMembersRepository.findById(memberIdToRemove);
-    if (!target || target.organizationId !== organizationId) {
-      throw new NotFoundException('Member not found in this organization');
-    }
+    await this.dataSource.transaction(async (manager) => {
+      const memberRepo =
+        this.organizationMembersRepository.withTransaction(manager);
+      await memberRepo.lockOrganization(organizationId);
 
-    if (target.role === OrganizationRole.OWNER) {
-      throw new BadRequestException(
-        'The organization owner cannot be removed directly — transfer ownership first',
-      );
-    }
+      const target = await memberRepo.findById(memberIdToRemove);
+      if (!target || target.organizationId !== organizationId) {
+        throw new NotFoundException('Member not found in this organization');
+      }
 
-    await this.organizationMembersRepository.removeMember(memberIdToRemove);
+      const activeOwners = await memberRepo.findActiveOwners(organizationId);
+      if (target.role === OrganizationRole.OWNER) {
+        const actor = await memberRepo.findByOrganizationAndUser(
+          organizationId,
+          actorUserId,
+        );
+
+        if (
+          activeOwners.length <= 1 &&
+          actor?.role === OrganizationRole.OWNER
+        ) {
+          throw new BadRequestException({
+            message:
+              'The organization owner cannot be removed directly — transfer ownership first',
+            code: 'LAST_OWNER_CANNOT_BE_REMOVED',
+          });
+        }
+
+        if (
+          activeOwners.length <= 1 ||
+          actor?.role !== OrganizationRole.OWNER
+        ) {
+          throw new BadRequestException(
+            'The organization owner cannot be removed directly — transfer ownership first',
+          );
+        }
+      }
+
+      await memberRepo.removeMember(memberIdToRemove);
+    });
   }
 
   async updateMemberRole(
@@ -68,51 +97,69 @@ export class OrganizationMembersService {
     memberId: string,
     newRole: OrganizationRole,
   ): Promise<void> {
-    const target = await this.organizationMembersRepository.findById(memberId);
-    if (!target || target.organizationId !== organizationId) {
-      throw new NotFoundException('Member not found in this organization');
-    }
+    await this.dataSource.transaction(async (manager) => {
+      const memberRepo =
+        this.organizationMembersRepository.withTransaction(manager);
+      await memberRepo.lockOrganization(organizationId);
 
-    if (
-      target.role === OrganizationRole.OWNER ||
-      newRole === OrganizationRole.OWNER
-    ) {
-      throw new BadRequestException(
-        'Use the ownership transfer action to change the Owner role',
-      );
-    }
+      const target = await memberRepo.findById(memberId);
+      if (!target || target.organizationId !== organizationId) {
+        throw new NotFoundException('Member not found in this organization');
+      }
 
-    await this.organizationMembersRepository.updateRole(memberId, newRole);
+      await memberRepo.findActiveOwners(organizationId);
+
+      if (
+        target.role === OrganizationRole.OWNER ||
+        newRole === OrganizationRole.OWNER
+      ) {
+        throw new BadRequestException(
+          'Use the ownership transfer action to change the Owner role',
+        );
+      }
+
+      await memberRepo.update(memberId, { role: newRole });
+    });
   }
 
   async transferOwnership(
     organizationId: string,
     newOwnerMemberId: string,
   ): Promise<void> {
-    const currentOwner =
-      await this.organizationMembersRepository.findOwner(organizationId);
-    if (!currentOwner) {
-      throw new NotFoundException('This organization has no current owner');
-    }
-
-    const newOwner =
-      await this.organizationMembersRepository.findById(newOwnerMemberId);
-    if (!newOwner || newOwner.organizationId !== organizationId) {
-      throw new NotFoundException(
-        'Target member not found in this organization',
-      );
-    }
-
-    if (newOwner.id === currentOwner.id) {
-      throw new BadRequestException('This member is already the owner');
-    }
-
     await this.dataSource.transaction(async (manager) => {
       const memberRepo =
         this.organizationMembersRepository.withTransaction(manager);
-      await memberRepo.update(currentOwner.id, {
-        role: OrganizationRole.ADMIN,
-      });
+
+      await memberRepo.lockOrganization(organizationId);
+      const currentOwners = await memberRepo.findActiveOwners(organizationId);
+      const currentOwner = currentOwners[0];
+      if (!currentOwner) {
+        throw new NotFoundException('This organization has no current owner');
+      }
+
+      const newOwner = await memberRepo.findById(newOwnerMemberId);
+      if (!newOwner || newOwner.organizationId !== organizationId) {
+        throw new NotFoundException(
+          'Target member not found in this organization',
+        );
+      }
+
+      if (newOwner.id === currentOwner.id && currentOwners.length === 1) {
+        throw new BadRequestException('This member is already the owner');
+      }
+
+      if (newOwner.user?.status !== UserStatus.ACTIVE) {
+        throw new BadRequestException({
+          message: 'Ownership cannot be transferred to an inactive member',
+          code: 'LAST_OWNER_CANNOT_BE_REMOVED',
+        });
+      }
+
+      for (const owner of currentOwners) {
+        if (owner.id !== newOwner.id) {
+          await memberRepo.update(owner.id, { role: OrganizationRole.ADMIN });
+        }
+      }
       await memberRepo.update(newOwner.id, { role: OrganizationRole.OWNER });
     });
   }
@@ -121,21 +168,32 @@ export class OrganizationMembersService {
     organizationId: string,
     userId: string,
   ): Promise<void> {
-    const membership =
-      await this.organizationMembersRepository.findByOrganizationAndUser(
+    await this.dataSource.transaction(async (manager) => {
+      const memberRepo =
+        this.organizationMembersRepository.withTransaction(manager);
+      await memberRepo.lockOrganization(organizationId);
+
+      const membership = await memberRepo.findByOrganizationAndUser(
         organizationId,
         userId,
       );
-    if (!membership) {
-      throw new NotFoundException('You are not a member of this organization');
-    }
+      if (!membership) {
+        throw new NotFoundException(
+          'You are not a member of this organization',
+        );
+      }
 
-    if (membership.role === OrganizationRole.OWNER) {
-      throw new BadRequestException(
-        'Transfer ownership before leaving the organization',
-      );
-    }
+      const activeOwners = await memberRepo.findActiveOwners(organizationId);
+      if (membership.role === OrganizationRole.OWNER) {
+        if (activeOwners.length <= 1) {
+          throw new BadRequestException({
+            message: 'Transfer ownership before leaving the organization',
+            code: 'LAST_OWNER_CANNOT_BE_REMOVED',
+          });
+        }
+      }
 
-    await this.organizationMembersRepository.removeMember(membership.id);
+      await memberRepo.removeMember(membership.id);
+    });
   }
 }
