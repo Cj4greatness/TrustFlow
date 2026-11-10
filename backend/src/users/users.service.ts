@@ -1,17 +1,25 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
-import { User } from './entities/user.entity';
+import { User, UserStatus } from './entities/user.entity';
+import { OrganizationMembersRepository } from '../organization-members/organization-members.repository';
+import { OrganizationRole } from '../organization-members/entities/organization-member.entity';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly usersRepository: UsersRepository,
+    private readonly organizationMembersRepository: OrganizationMembersRepository,
+  ) {}
 
   /**
    * Creates a user record directly. Note: this does NOT hash the
@@ -83,11 +91,46 @@ export class UsersService {
   }
 
   async softDelete(id: string): Promise<void> {
-    const existing = await this.usersRepository.findById(id);
-    if (!existing) {
-      throw new NotFoundException('User not found');
-    }
-    await this.usersRepository.softDelete(id);
+    await this.dataSource.transaction(async (manager) => {
+      const user = await this.usersRepository.findById(id, manager);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      const memberRepo =
+        this.organizationMembersRepository.withTransaction(manager);
+      const memberships = await memberRepo.findByUser(id);
+      const organizationIds = [
+        ...new Set(memberships.map((membership) => membership.organizationId)),
+      ].sort();
+
+      for (const organizationId of organizationIds) {
+        await memberRepo.lockOrganization(organizationId);
+      }
+
+      const currentMemberships = await memberRepo.findByUser(id);
+      if (user.status === UserStatus.ACTIVE) {
+        for (const membership of currentMemberships) {
+          if (membership.role !== OrganizationRole.OWNER) {
+            continue;
+          }
+
+          const activeOwners = await memberRepo.findActiveOwners(
+            membership.organizationId,
+          );
+          if (!activeOwners.some((owner) => owner.userId !== id)) {
+            throw new BadRequestException({
+              message: 'Transfer ownership first',
+              code: 'LAST_OWNER_CANNOT_BE_REMOVED',
+            });
+          }
+        }
+      }
+
+      await this.usersRepository.updateRefreshTokenHash(id, null, manager);
+      await memberRepo.softDeleteByUser(id);
+      await this.usersRepository.softDelete(id, manager);
+    });
   }
 
   async updateLastLogin(id: string): Promise<void> {
