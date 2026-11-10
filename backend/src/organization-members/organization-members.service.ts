@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -61,13 +62,12 @@ export class OrganizationMembersService {
         throw new NotFoundException('Member not found in this organization');
       }
 
+      const actor = await memberRepo.findByOrganizationAndUser(
+        organizationId,
+        actorUserId,
+      );
       const activeOwners = await memberRepo.findActiveOwners(organizationId);
       if (target.role === OrganizationRole.OWNER) {
-        const actor = await memberRepo.findByOrganizationAndUser(
-          organizationId,
-          actorUserId,
-        );
-
         if (
           activeOwners.length <= 1 &&
           actor?.role === OrganizationRole.OWNER
@@ -89,6 +89,16 @@ export class OrganizationMembersService {
         }
       }
 
+      if (
+        target.role === OrganizationRole.ADMIN &&
+        actor?.role !== OrganizationRole.OWNER
+      ) {
+        throw new ForbiddenException({
+          message: 'Only the organization owner may remove an Admin',
+          code: 'ADMIN_CANNOT_MODIFY_ADMIN',
+        });
+      }
+
       await memberRepo.removeMember(memberIdToRemove);
     });
   }
@@ -97,6 +107,7 @@ export class OrganizationMembersService {
     organizationId: string,
     memberId: string,
     newRole: OrganizationRole,
+    actorUserId: string,
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const memberRepo =
@@ -106,6 +117,21 @@ export class OrganizationMembersService {
       const target = await memberRepo.findById(memberId);
       if (!target || target.organizationId !== organizationId) {
         throw new NotFoundException('Member not found in this organization');
+      }
+
+      const actor = await memberRepo.findByOrganizationAndUser(
+        organizationId,
+        actorUserId,
+      );
+
+      if (
+        target.role === OrganizationRole.ADMIN &&
+        actor?.role !== OrganizationRole.OWNER
+      ) {
+        throw new ForbiddenException({
+          message: "Only the organization owner may change an Admin's role",
+          code: 'ADMIN_CANNOT_MODIFY_ADMIN',
+        });
       }
 
       if (
