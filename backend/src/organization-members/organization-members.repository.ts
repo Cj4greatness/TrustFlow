@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Organization } from '../organizations/entities/organization.entity';
@@ -79,11 +79,16 @@ export class OrganizationMembersRepository {
   withTransaction(manager: EntityManager) {
     const transactionalRepo = manager.getRepository(OrganizationMember);
     return {
-      lockOrganization: (organizationId: string) =>
-        manager.getRepository(Organization).findOne({
+      lockOrganization: async (organizationId: string) => {
+        const organization = await manager.getRepository(Organization).findOne({
           where: { id: organizationId },
           lock: { mode: 'pessimistic_write' },
-        }),
+        });
+        if (!organization) {
+          throw new NotFoundException('Organization not found');
+        }
+        return organization;
+      },
       findById: (id: string) =>
         transactionalRepo.findOne({ where: { id }, relations: { user: true } }),
       findByOrganizationAndUser: (organizationId: string, userId: string) =>

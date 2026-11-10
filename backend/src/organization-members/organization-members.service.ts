@@ -107,8 +107,6 @@ export class OrganizationMembersService {
         throw new NotFoundException('Member not found in this organization');
       }
 
-      await memberRepo.findActiveOwners(organizationId);
-
       if (
         target.role === OrganizationRole.OWNER ||
         newRole === OrganizationRole.OWNER
@@ -151,7 +149,7 @@ export class OrganizationMembersService {
       if (newOwner.user?.status !== UserStatus.ACTIVE) {
         throw new BadRequestException({
           message: 'Ownership cannot be transferred to an inactive member',
-          code: 'LAST_OWNER_CANNOT_BE_REMOVED',
+          code: 'OWNERSHIP_TARGET_INACTIVE',
         });
       }
 
