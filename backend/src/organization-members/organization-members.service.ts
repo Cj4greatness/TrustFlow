@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -134,6 +135,13 @@ export class OrganizationMembersService {
       if (!currentOwner) {
         throw new NotFoundException('This organization has no current owner');
       }
+      if (currentOwners.length > 1) {
+        throw new ConflictException({
+          message:
+            'This organization has multiple active Owners and needs separately authorized remediation',
+          code: 'OWNERSHIP_STATE_INCONSISTENT',
+        });
+      }
 
       const newOwner = await memberRepo.findById(newOwnerMemberId);
       if (!newOwner || newOwner.organizationId !== organizationId) {
@@ -153,11 +161,9 @@ export class OrganizationMembersService {
         });
       }
 
-      for (const owner of currentOwners) {
-        if (owner.id !== newOwner.id) {
-          await memberRepo.update(owner.id, { role: OrganizationRole.ADMIN });
-        }
-      }
+      await memberRepo.update(currentOwner.id, {
+        role: OrganizationRole.ADMIN,
+      });
       await memberRepo.update(newOwner.id, { role: OrganizationRole.OWNER });
     });
   }

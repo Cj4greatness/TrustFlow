@@ -7,7 +7,10 @@ import { AppModule } from '../../src/app.module';
 import { AuthService } from '../../src/auth/auth.service';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { OrganizationMembersRepository } from '../../src/organization-members/organization-members.repository';
-import { OrganizationRole } from '../../src/organization-members/entities/organization-member.entity';
+import {
+  OrganizationMember,
+  OrganizationRole,
+} from '../../src/organization-members/entities/organization-member.entity';
 import { User, UserStatus } from '../../src/users/entities/user.entity';
 import { DataSource } from 'typeorm';
 
@@ -49,7 +52,8 @@ type ContextName =
   | 'removeCoOwner'
   | 'adminRemoveCoOwner'
   | 'removeLastCoOwner'
-  | 'inactiveTransfer';
+  | 'inactiveTransfer'
+  | 'transferInconsistentOwners';
 
 interface OrganizationContext {
   id: string;
@@ -182,6 +186,7 @@ describe('Organization membership ownership invariants (e2e)', () => {
       'adminRemoveCoOwner',
       'removeLastCoOwner',
       'inactiveTransfer',
+      'transferInconsistentOwners',
     ];
     for (const name of contextNames) {
       contexts[name] = await createOrganizationContext(name);
@@ -428,5 +433,37 @@ describe('Organization membership ownership invariants (e2e)', () => {
       'OWNERSHIP_TARGET_INACTIVE',
     );
     await expectOneActiveOwner(context.id);
+  });
+
+  it('rejects transfers from an inconsistent multi-Owner state without changing roles', async () => {
+    const context = contexts.transferInconsistentOwners;
+    await app
+      .get(OrganizationMembersRepository)
+      .updateRole(context.memberIds.admin, OrganizationRole.OWNER);
+
+    const response = await request(server)
+      .post(`/organizations/${context.id}/members/transfer-ownership`)
+      .set(auth(tokens.owner))
+      .send({ newOwnerMemberId: context.memberIds.viewer });
+
+    expect(response.status).toBe(409);
+    expect((response.body as ErrorResponseBody).details?.code).toBe(
+      'OWNERSHIP_STATE_INCONSISTENT',
+    );
+
+    const memberships = await app
+      .get(DataSource)
+      .getRepository(OrganizationMember)
+      .find({ where: { organizationId: context.id } });
+    expect(
+      memberships
+        .filter((member) => member.role === OrganizationRole.OWNER)
+        .map((member) => member.id)
+        .sort(),
+    ).toEqual([context.memberIds.owner, context.memberIds.admin].sort());
+    expect(
+      memberships.find((member) => member.id === context.memberIds.viewer)
+        ?.role,
+    ).toBe(OrganizationRole.VIEWER);
   });
 });
