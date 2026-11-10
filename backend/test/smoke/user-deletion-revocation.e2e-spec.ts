@@ -150,7 +150,7 @@ describe('User deletion revokes sessions and memberships (e2e)', () => {
     await request(server)
       .get(`/organizations/${organizationIds[0]}/members`)
       .set(auth(member))
-      .expect(403);
+      .expect(401);
 
     const deletedUser = await dataSource.getRepository(User).findOne({
       where: { id: member.id },
