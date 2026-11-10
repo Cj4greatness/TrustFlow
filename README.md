@@ -253,3 +253,10 @@ source ~/.bashrc
 - **Engineer** — Chisom Johnson
 
 Built one sprint at a time, foundation before features.
+
+## Required toolchain
+
+- Node 22.23.4 (see `.nvmrc`; with nvm run `nvm use`)
+- pnpm 9.15.9, pinned via the `packageManager` field
+
+Setup: `corepack enable && corepack prepare pnpm@9.15.9 --activate`, then verify with `node -v` and `pnpm -v` from inside `backend/`. CI fails if either version differs.

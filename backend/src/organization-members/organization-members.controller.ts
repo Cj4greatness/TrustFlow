@@ -58,11 +58,13 @@ export class OrganizationMembersController {
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
     @Body() dto: UpdateMemberRoleDto,
+    @Req() req: RequestWithUser,
   ): Promise<void> {
     await this.organizationMembersService.updateMemberRole(
       organizationId,
       memberId,
       dto.role,
+      req.user.id,
     );
   }
 
@@ -75,10 +77,12 @@ export class OrganizationMembersController {
   async removeMember(
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
+    @Req() req: RequestWithUser,
   ): Promise<void> {
     await this.organizationMembersService.removeMember(
       organizationId,
       memberId,
+      req.user.id,
     );
   }
 

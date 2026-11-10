@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { Organization } from '../organizations/entities/organization.entity';
+import { UserStatus } from '../users/entities/user.entity';
 import {
   OrganizationMember,
   OrganizationRole,
@@ -77,11 +79,42 @@ export class OrganizationMembersRepository {
   withTransaction(manager: EntityManager) {
     const transactionalRepo = manager.getRepository(OrganizationMember);
     return {
+      lockOrganization: async (organizationId: string) => {
+        const organization = await manager.getRepository(Organization).findOne({
+          where: { id: organizationId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!organization) {
+          throw new NotFoundException('Organization not found');
+        }
+        return organization;
+      },
+      findById: (id: string) =>
+        transactionalRepo.findOne({ where: { id }, relations: { user: true } }),
+      findByOrganizationAndUser: (organizationId: string, userId: string) =>
+        transactionalRepo.findOne({ where: { organizationId, userId } }),
+      findActiveOwners: (organizationId: string) =>
+        transactionalRepo
+          .createQueryBuilder('member')
+          .innerJoin('member.user', 'user')
+          .where('member.organizationId = :organizationId', {
+            organizationId,
+          })
+          .andWhere('member.role = :ownerRole', {
+            ownerRole: OrganizationRole.OWNER,
+          })
+          .andWhere('member.deletedAt IS NULL')
+          .andWhere('user.deletedAt IS NULL')
+          .andWhere('user.status = :activeStatus', {
+            activeStatus: UserStatus.ACTIVE,
+          })
+          .getMany(),
       create: (data: Partial<OrganizationMember>) =>
         transactionalRepo.create(data),
       save: (member: OrganizationMember) => transactionalRepo.save(member),
       update: (id: string, data: Partial<OrganizationMember>) =>
         transactionalRepo.update({ id }, data),
+      removeMember: (id: string) => transactionalRepo.delete({ id }),
     };
   }
 }

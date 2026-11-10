@@ -240,6 +240,18 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
     await inviteAndAccept(managerEmail, managerToken, 'manager');
     await inviteAndAccept(viewerEmail, viewerToken, 'viewer');
 
+    const orgBInvite = await request(server)
+      .post(`/organizations/${orgBId}/invitations`)
+      .set('Authorization', `Bearer ${orgBOwnerToken}`)
+      .send({ email: adminEmail, role: 'admin' })
+      .expect(201);
+    await request(server)
+      .post(
+        `/organizations/invitations/${(orgBInvite.body as InvitationResponseBody).token}/accept`,
+      )
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+
     const customerRes = await request(server)
       .post(`/organizations/${orgAId}/customers`)
       .set('Authorization', `Bearer ${ownerToken}`)
@@ -415,6 +427,98 @@ describe('Receipts — Full Chain, Branding Snapshot, RBAC & Idempotency (e2e)',
   });
 
   describe('Regenerate — recovery mechanism (Backend Readiness & Freeze Audit, Section 3)', () => {
+    it('returns receipt:regenerate in Admin membership permissions', async () => {
+      const res = await request(server)
+        .get(`/organizations/${orgAId}/me`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect((res.body as { permissions: string[] }).permissions).toContain(
+        'receipt:regenerate',
+      );
+    });
+
+    it('allows Admin to regenerate a missing SUCCESS receipt idempotently without changing payment or invoice rows', async () => {
+      const { payment, invoiceId } = await createPaidOrderWithReceipt(400, 1);
+      const original = await waitForReceipt(payment.id);
+      await dataSource.getRepository(Receipt).delete({ id: original.id });
+      const paymentBefore = await dataSource.query<Record<string, unknown>[]>(
+        'SELECT * FROM payments WHERE id = $1',
+        [payment.id],
+      );
+      const invoiceBefore = await dataSource.query<Record<string, unknown>[]>(
+        'SELECT * FROM invoices WHERE id = $1',
+        [invoiceId],
+      );
+      expect(paymentBefore).toHaveLength(1);
+      expect(invoiceBefore).toHaveLength(1);
+      expect(paymentBefore[0].status).toBe(PaymentStatus.SUCCESS);
+
+      const first = await request(server)
+        .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      const receipt = first.body as ReceiptResponseBody;
+      expect(receipt.paymentId).toBe(payment.id);
+      expect(receipt.status).toBe('issued');
+      expect(receipt.id).not.toBe(original.id);
+      expect(
+        await dataSource.query<Record<string, unknown>[]>(
+          'SELECT * FROM payments WHERE id = $1',
+          [payment.id],
+        ),
+      ).toEqual(paymentBefore);
+      expect(
+        await dataSource.query<Record<string, unknown>[]>(
+          'SELECT * FROM invoices WHERE id = $1',
+          [invoiceId],
+        ),
+      ).toEqual(invoiceBefore);
+
+      const second = await request(server)
+        .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect((second.body as ReceiptResponseBody).id).toBe(receipt.id);
+      expect((second.body as ReceiptResponseBody).receiptNumber).toBe(
+        receipt.receiptNumber,
+      );
+      expect(
+        await dataSource.query<Record<string, unknown>[]>(
+          'SELECT * FROM payments WHERE id = $1',
+          [payment.id],
+        ),
+      ).toEqual(paymentBefore);
+      expect(
+        await dataSource.query<Record<string, unknown>[]>(
+          'SELECT * FROM invoices WHERE id = $1',
+          [invoiceId],
+        ),
+      ).toEqual(invoiceBefore);
+    });
+
+    it('forbids Viewer from regenerating a receipt', async () => {
+      const { payment } = await createPaidOrderWithReceipt(200, 1);
+      await waitForReceipt(payment.id);
+      await request(server)
+        .post(`/organizations/${orgAId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${viewerToken}`)
+        .expect(403);
+    });
+
+    it("prevents Org B's Admin from reaching Org A's payment through Org B's route", async () => {
+      const { payment } = await createPaidOrderWithReceipt(250, 1);
+      await waitForReceipt(payment.id);
+      const membership = await request(server)
+        .get(`/organizations/${orgBId}/me`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect((membership.body as { role: string }).role).toBe('admin');
+      await request(server)
+        .post(`/organizations/${orgBId}/receipts/regenerate/${payment.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+    });
+
     it('creates the missing receipt when none exists for a successful payment', async () => {
       const { payment } = await createPaidOrderWithReceipt(400, 1);
       const original = await waitForReceipt(payment.id);
