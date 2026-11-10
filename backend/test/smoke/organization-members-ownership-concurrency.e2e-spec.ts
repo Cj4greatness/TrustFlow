@@ -6,6 +6,13 @@ import { randomUUID } from 'crypto';
 import { AppModule } from '../../src/app.module';
 import { AuthService } from '../../src/auth/auth.service';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
+import { OrganizationMembersRepository } from '../../src/organization-members/organization-members.repository';
+import {
+  OrganizationMember,
+  OrganizationRole,
+} from '../../src/organization-members/entities/organization-member.entity';
+import { User, UserStatus } from '../../src/users/entities/user.entity';
+import { DataSource } from 'typeorm';
 
 interface OrganizationBody {
   id: string;
@@ -40,7 +47,13 @@ type ContextName =
   | 'transferRace'
   | 'roleChanges'
   | 'crossOrg'
-  | 'crossOrgTarget';
+  | 'crossOrgTarget'
+  | 'leaveCoOwner'
+  | 'removeCoOwner'
+  | 'adminRemoveCoOwner'
+  | 'removeLastCoOwner'
+  | 'inactiveTransfer'
+  | 'transferInconsistentOwners';
 
 interface OrganizationContext {
   id: string;
@@ -132,8 +145,11 @@ describe('Organization membership ownership invariants (e2e)', () => {
     return response.body as MemberBody[];
   };
 
-  const expectOneActiveOwner = async (organizationId: string) => {
-    const members = await listMembers(organizationId, tokens.owner);
+  const expectOneActiveOwner = async (
+    organizationId: string,
+    token = tokens.owner,
+  ) => {
+    const members = await listMembers(organizationId, token);
     expect(
       members.filter(
         (member) => member.role === 'owner' && member.user.status === 'active',
@@ -165,6 +181,12 @@ describe('Organization membership ownership invariants (e2e)', () => {
       'roleChanges',
       'crossOrg',
       'crossOrgTarget',
+      'leaveCoOwner',
+      'removeCoOwner',
+      'adminRemoveCoOwner',
+      'removeLastCoOwner',
+      'inactiveTransfer',
+      'transferInconsistentOwners',
     ];
     for (const name of contextNames) {
       contexts[name] = await createOrganizationContext(name);
@@ -308,5 +330,140 @@ describe('Organization membership ownership invariants (e2e)', () => {
       )
       .set(auth(tokens.owner))
       .expect(404);
+  });
+
+  it('allows an Owner to leave when another active Owner remains', async () => {
+    const context = contexts.leaveCoOwner;
+    await app
+      .get(OrganizationMembersRepository)
+      .updateRole(context.memberIds.admin, OrganizationRole.OWNER);
+
+    await request(server)
+      .post(`/organizations/${context.id}/members/leave`)
+      .set(auth(tokens.owner))
+      .expect(204);
+
+    const members = await listMembers(context.id, tokens.admin);
+    expect(
+      members.find((member) => member.id === context.memberIds.owner),
+    ).toBe(undefined);
+    expect(
+      members.find((member) => member.id === context.memberIds.admin)?.role,
+    ).toBe('owner');
+    await expectOneActiveOwner(context.id, tokens.admin);
+  });
+
+  it('allows an Owner to remove another Owner while leaving an active Owner', async () => {
+    const context = contexts.removeCoOwner;
+    await app
+      .get(OrganizationMembersRepository)
+      .updateRole(context.memberIds.admin, OrganizationRole.OWNER);
+
+    await request(server)
+      .delete(`/organizations/${context.id}/members/${context.memberIds.admin}`)
+      .set(auth(tokens.owner))
+      .expect(204);
+
+    await expectOneActiveOwner(context.id);
+  });
+
+  it('does not allow an Admin to remove an Owner when two active Owners exist', async () => {
+    const context = contexts.adminRemoveCoOwner;
+    await app
+      .get(OrganizationMembersRepository)
+      .updateRole(context.memberIds.manager, OrganizationRole.OWNER);
+
+    await request(server)
+      .delete(
+        `/organizations/${context.id}/members/${context.memberIds.manager}`,
+      )
+      .set(auth(tokens.admin))
+      .expect(400);
+
+    const members = await listMembers(context.id, tokens.owner);
+    expect(
+      members.filter(
+        (member) => member.role === 'owner' && member.user.status === 'active',
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('blocks removal of the last active Owner even when the organization began with two', async () => {
+    const context = contexts.removeLastCoOwner;
+    await app
+      .get(OrganizationMembersRepository)
+      .updateRole(context.memberIds.admin, OrganizationRole.OWNER);
+
+    await request(server)
+      .delete(`/organizations/${context.id}/members/${context.memberIds.admin}`)
+      .set(auth(tokens.owner))
+      .expect(204);
+
+    const response = await request(server)
+      .delete(`/organizations/${context.id}/members/${context.memberIds.owner}`)
+      .set(auth(tokens.owner));
+
+    expect(response.status).toBe(400);
+    expect((response.body as ErrorResponseBody).details?.code).toBe(
+      'LAST_OWNER_CANNOT_BE_REMOVED',
+    );
+    await expectOneActiveOwner(context.id);
+  });
+
+  it('rejects transferring ownership to an inactive member with its own error code', async () => {
+    const context = contexts.inactiveTransfer;
+    const membersRepository = app.get(OrganizationMembersRepository);
+    const inactiveTarget = await membersRepository.findById(
+      context.memberIds.viewer,
+    );
+    expect(inactiveTarget).toBeDefined();
+
+    await app
+      .get(DataSource)
+      .getRepository(User)
+      .update({ id: inactiveTarget!.userId }, { status: UserStatus.SUSPENDED });
+
+    const response = await request(server)
+      .post(`/organizations/${context.id}/members/transfer-ownership`)
+      .set(auth(tokens.owner))
+      .send({ newOwnerMemberId: context.memberIds.viewer });
+
+    expect(response.status).toBe(400);
+    expect((response.body as ErrorResponseBody).details?.code).toBe(
+      'OWNERSHIP_TARGET_INACTIVE',
+    );
+    await expectOneActiveOwner(context.id);
+  });
+
+  it('rejects transfers from an inconsistent multi-Owner state without changing roles', async () => {
+    const context = contexts.transferInconsistentOwners;
+    await app
+      .get(OrganizationMembersRepository)
+      .updateRole(context.memberIds.admin, OrganizationRole.OWNER);
+
+    const response = await request(server)
+      .post(`/organizations/${context.id}/members/transfer-ownership`)
+      .set(auth(tokens.owner))
+      .send({ newOwnerMemberId: context.memberIds.viewer });
+
+    expect(response.status).toBe(409);
+    expect((response.body as ErrorResponseBody).details?.code).toBe(
+      'OWNERSHIP_STATE_INCONSISTENT',
+    );
+
+    const memberships = await app
+      .get(DataSource)
+      .getRepository(OrganizationMember)
+      .find({ where: { organizationId: context.id } });
+    expect(
+      memberships
+        .filter((member) => member.role === OrganizationRole.OWNER)
+        .map((member) => member.id)
+        .sort(),
+    ).toEqual([context.memberIds.owner, context.memberIds.admin].sort());
+    expect(
+      memberships.find((member) => member.id === context.memberIds.viewer)
+        ?.role,
+    ).toBe(OrganizationRole.VIEWER);
   });
 });

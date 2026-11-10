@@ -58,11 +58,13 @@ export class OrganizationMembersController {
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
     @Body() dto: UpdateMemberRoleDto,
+    @Req() req: RequestWithUser,
   ): Promise<void> {
     await this.organizationMembersService.updateMemberRole(
       organizationId,
       memberId,
       dto.role,
+      req.user.id,
     );
   }
 

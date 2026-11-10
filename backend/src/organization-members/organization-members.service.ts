@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -60,13 +62,12 @@ export class OrganizationMembersService {
         throw new NotFoundException('Member not found in this organization');
       }
 
+      const actor = await memberRepo.findByOrganizationAndUser(
+        organizationId,
+        actorUserId,
+      );
       const activeOwners = await memberRepo.findActiveOwners(organizationId);
       if (target.role === OrganizationRole.OWNER) {
-        const actor = await memberRepo.findByOrganizationAndUser(
-          organizationId,
-          actorUserId,
-        );
-
         if (
           activeOwners.length <= 1 &&
           actor?.role === OrganizationRole.OWNER
@@ -88,6 +89,16 @@ export class OrganizationMembersService {
         }
       }
 
+      if (
+        target.role === OrganizationRole.ADMIN &&
+        actor?.role !== OrganizationRole.OWNER
+      ) {
+        throw new ForbiddenException({
+          message: 'Only the organization owner may remove an Admin',
+          code: 'ADMIN_CANNOT_MODIFY_ADMIN',
+        });
+      }
+
       await memberRepo.removeMember(memberIdToRemove);
     });
   }
@@ -96,6 +107,7 @@ export class OrganizationMembersService {
     organizationId: string,
     memberId: string,
     newRole: OrganizationRole,
+    actorUserId: string,
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const memberRepo =
@@ -107,7 +119,20 @@ export class OrganizationMembersService {
         throw new NotFoundException('Member not found in this organization');
       }
 
-      await memberRepo.findActiveOwners(organizationId);
+      const actor = await memberRepo.findByOrganizationAndUser(
+        organizationId,
+        actorUserId,
+      );
+
+      if (
+        target.role === OrganizationRole.ADMIN &&
+        actor?.role !== OrganizationRole.OWNER
+      ) {
+        throw new ForbiddenException({
+          message: "Only the organization owner may change an Admin's role",
+          code: 'ADMIN_CANNOT_MODIFY_ADMIN',
+        });
+      }
 
       if (
         target.role === OrganizationRole.OWNER ||
@@ -136,6 +161,13 @@ export class OrganizationMembersService {
       if (!currentOwner) {
         throw new NotFoundException('This organization has no current owner');
       }
+      if (currentOwners.length > 1) {
+        throw new ConflictException({
+          message:
+            'This organization has multiple active Owners and needs separately authorized remediation',
+          code: 'OWNERSHIP_STATE_INCONSISTENT',
+        });
+      }
 
       const newOwner = await memberRepo.findById(newOwnerMemberId);
       if (!newOwner || newOwner.organizationId !== organizationId) {
@@ -151,15 +183,13 @@ export class OrganizationMembersService {
       if (newOwner.user?.status !== UserStatus.ACTIVE) {
         throw new BadRequestException({
           message: 'Ownership cannot be transferred to an inactive member',
-          code: 'LAST_OWNER_CANNOT_BE_REMOVED',
+          code: 'OWNERSHIP_TARGET_INACTIVE',
         });
       }
 
-      for (const owner of currentOwners) {
-        if (owner.id !== newOwner.id) {
-          await memberRepo.update(owner.id, { role: OrganizationRole.ADMIN });
-        }
-      }
+      await memberRepo.update(currentOwner.id, {
+        role: OrganizationRole.ADMIN,
+      });
       await memberRepo.update(newOwner.id, { role: OrganizationRole.OWNER });
     });
   }
