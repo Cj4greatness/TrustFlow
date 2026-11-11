@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { UsersRepository } from '../users/users.repository';
@@ -14,6 +15,18 @@ import { AuthResponse } from './types/auth-response.type';
 import { JwtPayload } from './types/jwt-payload.type';
 
 const RECENTLY_ROTATED_WINDOW_MS = 10_000;
+
+interface RefreshRequestContext {
+  ip: string;
+  userAgent: string;
+}
+
+type RefreshFailureClassification = 'expected' | 'suspicious';
+
+interface RefreshFailure {
+  reason: string;
+  classification: RefreshFailureClassification;
+}
 
 @Injectable()
 export class AuthService {
@@ -31,6 +44,7 @@ export class AuthService {
    * email enumeration).
    */
   private dummyPasswordHash: Promise<string> | null = null;
+  private readonly logger = new Logger(AuthService.name);
 
   private getDummyPasswordHash(): Promise<string> {
     this.dummyPasswordHash ??= this.passwordService.hash(
@@ -117,46 +131,100 @@ export class AuthService {
    * outside that grace window still wipes the session, unchanged
    * from before.
    */
-  async refresh(refreshToken: string): Promise<AuthResponse> {
-    let payload: JwtPayload;
+  async refresh(
+    refreshToken: string,
+    context: RefreshRequestContext = { ip: '', userAgent: '' },
+  ): Promise<AuthResponse> {
+    let userId: string | undefined;
+    let failure: RefreshFailure | undefined;
     try {
-      payload = this.tokenService.verifyRefreshToken(refreshToken);
-    } catch {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      let payload: JwtPayload;
+      try {
+        payload = this.tokenService.verifyRefreshToken(refreshToken);
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : undefined;
+        const isExpired = errorName === 'TokenExpiredError';
+        const isJwtVerificationFailure =
+          errorName === 'JsonWebTokenError' || errorName === 'NotBeforeError';
+        failure = {
+          reason: isExpired
+            ? 'token_expired'
+            : isJwtVerificationFailure
+              ? 'malformed_or_unverifiable_token'
+              : 'unexpected_exception',
+          classification: isExpired ? 'expected' : 'suspicious',
+        };
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      const user = await this.usersRepository.findById(payload.sub);
+      if (!user) {
+        failure = {
+          reason: 'user_missing_or_deleted',
+          classification: 'suspicious',
+        };
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+      userId = user.id;
+
+      if (!user.refreshTokenHash) {
+        failure = {
+          reason: 'refresh_token_session_unavailable',
+          classification: 'suspicious',
+        };
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      const tokenMatches = await this.passwordService.verify(
+        user.refreshTokenHash,
+        refreshToken,
+      );
+
+      if (!tokenMatches) {
+        return await this.rejectAsRecentlyRotatedOrWipe(
+          user.id,
+          refreshToken,
+          (reason, classification) => {
+            failure = { reason, classification };
+          },
+        );
+      }
+
+      // Build the replacement pair before attempting the swap. If we
+      // lose the race, these are discarded — never returned to the caller.
+      const tokens = this.tokenService.generateTokenPair(user);
+      const newRefreshTokenHash = await this.passwordService.hash(
+        tokens.refreshToken,
+      );
+
+      const won = await this.usersRepository.rotateRefreshTokenHash(
+        user.id,
+        user.refreshTokenHash,
+        newRefreshTokenHash,
+      );
+
+      if (!won) {
+        return await this.rejectAsRecentlyRotatedOrWipe(
+          user.id,
+          refreshToken,
+          (reason, classification) => {
+            failure = { reason, classification };
+          },
+        );
+      }
+
+      return this.buildAuthResponse(user, tokens);
+    } catch (error) {
+      this.logRefreshFailure(
+        failure ?? {
+          reason: 'unexpected_exception',
+          classification: 'suspicious',
+        },
+        userId,
+        context,
+      );
+      throw error;
     }
-
-    const user = await this.usersRepository.findById(payload.sub);
-    if (!user || !user.refreshTokenHash) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
-    }
-
-    const tokenMatches = await this.passwordService.verify(
-      user.refreshTokenHash,
-      refreshToken,
-    );
-
-    if (!tokenMatches) {
-      return this.rejectAsRecentlyRotatedOrWipe(user.id, refreshToken);
-    }
-
-    // Build the replacement pair before attempting the swap. If we
-    // lose the race, these are discarded — never returned to the caller.
-    const tokens = this.tokenService.generateTokenPair(user);
-    const newRefreshTokenHash = await this.passwordService.hash(
-      tokens.refreshToken,
-    );
-
-    const won = await this.usersRepository.rotateRefreshTokenHash(
-      user.id,
-      user.refreshTokenHash,
-      newRefreshTokenHash,
-    );
-
-    if (!won) {
-      return this.rejectAsRecentlyRotatedOrWipe(user.id, refreshToken);
-    }
-
-    return this.buildAuthResponse(user, tokens);
   }
 
   async logout(userId: string): Promise<void> {
@@ -181,6 +249,10 @@ export class AuthService {
   private async rejectAsRecentlyRotatedOrWipe(
     userId: string,
     presentedToken: string,
+    onFailure: (
+      reason: string,
+      classification: RefreshFailureClassification,
+    ) => void,
   ): Promise<never> {
     const user = await this.usersRepository.findById(userId);
 
@@ -192,6 +264,7 @@ export class AuthService {
       ));
 
     if (matchesDisplaced) {
+      onFailure('session_replaced_by_new_login', 'expected');
       throw new UnauthorizedException({
         message: 'This session was replaced by a login on another device',
         code: 'SESSION_REPLACED_BY_NEW_LOGIN',
@@ -212,6 +285,7 @@ export class AuthService {
       ));
 
     if (matchesPrevious) {
+      onFailure('refresh_token_recently_rotated', 'expected');
       throw new UnauthorizedException({
         message: 'Refresh token was already rotated by a concurrent request',
         code: 'REFRESH_TOKEN_RECENTLY_ROTATED',
@@ -222,7 +296,37 @@ export class AuthService {
     // compromised refresh token can't be used again, even if
     // presented correctly a second time.
     await this.usersRepository.updateRefreshTokenHash(userId, null);
+    onFailure(
+      user ? 'refresh_token_reuse_detected' : 'user_missing_or_deleted',
+      'suspicious',
+    );
     throw new UnauthorizedException('Invalid or expired refresh token');
+  }
+
+  private logRefreshFailure(
+    failure: RefreshFailure,
+    userId: string | undefined,
+    context: RefreshRequestContext,
+  ): void {
+    try {
+      const event = {
+        event: 'auth.refresh_failed',
+        reason: failure.reason,
+        classification: failure.classification,
+        ...(userId ? { userId } : {}),
+        ip: context.ip,
+        userAgent: context.userAgent.slice(0, 200),
+        timestamp: new Date().toISOString(),
+      };
+      const serializedEvent = JSON.stringify(event);
+      if (failure.classification === 'expected') {
+        this.logger.log(serializedEvent);
+      } else {
+        this.logger.warn(serializedEvent);
+      }
+    } catch {
+      // Logging must never alter the refresh response.
+    }
   }
 
   /**
