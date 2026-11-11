@@ -44,7 +44,11 @@ type ContextName =
   | 'crossOrgSource'
   | 'crossOrgTarget'
   | 'race'
-  | 'adminPromotion';
+  | 'adminPromotion'
+  | 'adminSelfDemoteStaff'
+  | 'adminSelfDemoteViewer'
+  | 'adminSelfInvalid'
+  | 'selfDemotionRace';
 
 interface OrganizationContext {
   id: string;
@@ -173,6 +177,10 @@ describe('Admin versus Admin governance (e2e)', () => {
       'crossOrgTarget',
       'race',
       'adminPromotion',
+      'adminSelfDemoteStaff',
+      'adminSelfDemoteViewer',
+      'adminSelfInvalid',
+      'selfDemotionRace',
     ];
     for (const contextName of contextNames) {
       contexts[contextName] = await createOrganizationContext(contextName);
@@ -226,7 +234,7 @@ describe('Admin versus Admin governance (e2e)', () => {
     expect(await getMembership(context.id, context.memberIds.admin)).toBeNull();
   });
 
-  it('allows the Owner to change an Admin role', async () => {
+  it('allows the Owner to change an Admin role and promote a Manager to Admin', async () => {
     const context = contexts.ownerChangeAdmin;
     await request(server)
       .patch(`/organizations/${context.id}/members/${context.memberIds.admin}`)
@@ -237,6 +245,17 @@ describe('Admin versus Admin governance (e2e)', () => {
     expect(
       (await getMembership(context.id, context.memberIds.admin))?.role,
     ).toBe(OrganizationRole.MANAGER);
+
+    await request(server)
+      .patch(
+        `/organizations/${context.id}/members/${context.memberIds.manager}`,
+      )
+      .set(headersFor('owner'))
+      .send({ role: OrganizationRole.ADMIN })
+      .expect((response) => expect([200, 204]).toContain(response.status));
+    expect(
+      (await getMembership(context.id, context.memberIds.manager))?.role,
+    ).toBe(OrganizationRole.ADMIN);
   });
 
   it.each(['manager', 'staff', 'viewer'] as const)(
@@ -283,17 +302,8 @@ describe('Admin versus Admin governance (e2e)', () => {
     ).toBe(OrganizationRole.OWNER);
   });
 
-  it('applies the same Admin restriction when an Admin acts on their own membership', async () => {
+  it('allows an Admin to demote themselves, then revokes Admin-only member actions', async () => {
     const context = contexts.adminSelf;
-    const changeResponse = await request(server)
-      .patch(`/organizations/${context.id}/members/${context.memberIds.admin}`)
-      .set(headersFor('admin'))
-      .send({ role: OrganizationRole.MANAGER });
-    expect(changeResponse.status).toBe(403);
-    expect((changeResponse.body as ErrorResponseBody).details?.code).toBe(
-      'ADMIN_CANNOT_MODIFY_ADMIN',
-    );
-
     const removeResponse = await request(server)
       .delete(`/organizations/${context.id}/members/${context.memberIds.admin}`)
       .set(headersFor('admin'));
@@ -301,9 +311,23 @@ describe('Admin versus Admin governance (e2e)', () => {
     expect((removeResponse.body as ErrorResponseBody).details?.code).toBe(
       'ADMIN_CANNOT_MODIFY_ADMIN',
     );
+
+    await request(server)
+      .patch(`/organizations/${context.id}/members/${context.memberIds.admin}`)
+      .set(headersFor('admin'))
+      .send({ role: OrganizationRole.MANAGER })
+      .expect((response) => expect([200, 204]).toContain(response.status));
+
     expect(
       (await getMembership(context.id, context.memberIds.admin))?.role,
-    ).toBe(OrganizationRole.ADMIN);
+    ).toBe(OrganizationRole.MANAGER);
+
+    await request(server)
+      .delete(
+        `/organizations/${context.id}/members/${context.memberIds.manager}`,
+      )
+      .set(headersFor('admin'))
+      .expect(403);
   });
 
   it('returns the existing 404 for a target in another organization', async () => {
@@ -313,21 +337,100 @@ describe('Admin versus Admin governance (e2e)', () => {
       .delete(`/organizations/${source.id}/members/${target.memberIds.viewer}`)
       .set(headersFor('owner'))
       .expect(404);
+
+    await request(server)
+      .patch(`/organizations/${source.id}/members/${target.memberIds.viewer}`)
+      .set(headersFor('owner'))
+      .send({ role: OrganizationRole.MANAGER })
+      .expect(404);
   });
 
-  it('allows an Admin to promote a lower-role member to Admin', async () => {
+  it('blocks Admin promotion to Admin while allowing the Owner to promote', async () => {
     const context = contexts.adminPromotion;
-    await request(server)
+    const response = await request(server)
       .patch(
         `/organizations/${context.id}/members/${context.memberIds.manager}`,
       )
       .set(headersFor('admin'))
       .send({ role: OrganizationRole.ADMIN })
-      .expect((response) => expect([200, 204]).toContain(response.status));
+      .expect(403);
 
+    expect((response.body as ErrorResponseBody).details?.code).toBe(
+      'ADMIN_PROMOTION_OWNER_ONLY',
+    );
     expect(
       (await getMembership(context.id, context.memberIds.manager))?.role,
+    ).toBe(OrganizationRole.MANAGER);
+  });
+
+  it.each([
+    ['staff', 'adminSelfDemoteStaff', OrganizationRole.STAFF],
+    ['viewer', 'adminSelfDemoteViewer', OrganizationRole.VIEWER],
+  ] as const)(
+    'allows an Admin to demote themselves to %s',
+    async (_role, contextName, newRole) => {
+      const context = contexts[contextName];
+      await request(server)
+        .patch(
+          `/organizations/${context.id}/members/${context.memberIds.admin}`,
+        )
+        .set(headersFor('admin'))
+        .send({ role: newRole })
+        .expect((response) => expect([200, 204]).toContain(response.status));
+
+      expect(
+        (await getMembership(context.id, context.memberIds.admin))?.role,
+      ).toBe(newRole);
+    },
+  );
+
+  it('keeps Admin self-change to ADMIN or OWNER rejected', async () => {
+    const context = contexts.adminSelfInvalid;
+
+    const adminResponse = await request(server)
+      .patch(`/organizations/${context.id}/members/${context.memberIds.admin}`)
+      .set(headersFor('admin'))
+      .send({ role: OrganizationRole.ADMIN })
+      .expect(403);
+    expect((adminResponse.body as ErrorResponseBody).details?.code).toBe(
+      'ADMIN_PROMOTION_OWNER_ONLY',
+    );
+
+    await request(server)
+      .patch(`/organizations/${context.id}/members/${context.memberIds.admin}`)
+      .set(headersFor('admin'))
+      .send({ role: OrganizationRole.OWNER })
+      .expect(400);
+
+    expect(
+      (await getMembership(context.id, context.memberIds.admin))?.role,
     ).toBe(OrganizationRole.ADMIN);
+  });
+
+  it('serializes an Owner role change against Admin self-demotion', async () => {
+    const context = contexts.selfDemotionRace;
+    const [ownerResponse, adminResponse] = await Promise.all([
+      request(server)
+        .patch(
+          `/organizations/${context.id}/members/${context.memberIds.admin}`,
+        )
+        .set(headersFor('owner'))
+        .send({ role: OrganizationRole.MANAGER }),
+      request(server)
+        .patch(
+          `/organizations/${context.id}/members/${context.memberIds.admin}`,
+        )
+        .set(headersFor('admin'))
+        .send({ role: OrganizationRole.VIEWER }),
+    ]);
+
+    expect([200, 204]).toContain(ownerResponse.status);
+    expect([200, 204, 403]).toContain(adminResponse.status);
+    expect(ownerResponse.status).not.toBe(500);
+    expect(adminResponse.status).not.toBe(500);
+    const role = (await getMembership(context.id, context.memberIds.admin))
+      ?.role;
+    expect([OrganizationRole.MANAGER, OrganizationRole.VIEWER]).toContain(role);
   });
 
   it('serializes Admin removal against the Owner promoting a Manager to Admin', async () => {
