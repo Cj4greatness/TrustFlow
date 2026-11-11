@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { UsersRepository } from '../users/users.repository';
 import { PasswordService } from '../security/password.service';
 import { TokenService } from './services/token.service';
@@ -21,7 +22,32 @@ export class AuthService {
     private readonly usersRepository: UsersRepository,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
+    private readonly configService: ConfigService,
   ) {}
+
+  private get sessionMaxLifetimeMs(): number {
+    const days = this.configService.get<number>('session.maxLifetimeDays', 30);
+    return days * 24 * 60 * 60 * 1000;
+  }
+
+  private sessionCutoff(): Date {
+    return new Date(Date.now() - this.sessionMaxLifetimeMs);
+  }
+
+  private isSessionExpired(user: User, cutoff: Date): boolean {
+    return (
+      !user.sessionStartedAt ||
+      user.sessionStartedAt.getTime() <= cutoff.getTime()
+    );
+  }
+
+  private async rejectExpiredSession(userId: string): Promise<never> {
+    await this.usersRepository.updateRefreshTokenHash(userId, null);
+    throw new UnauthorizedException({
+      message: 'Session has expired. Please log in again',
+      code: 'SESSION_MAX_LIFETIME_EXCEEDED',
+    });
+  }
 
   /**
    * A valid Argon2 hash with no real matching password, computed once
@@ -129,6 +155,9 @@ export class AuthService {
     if (!user || !user.refreshTokenHash) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+    if (this.isSessionExpired(user, this.sessionCutoff())) {
+      return this.rejectExpiredSession(user.id);
+    }
 
     const tokenMatches = await this.passwordService.verify(
       user.refreshTokenHash,
@@ -146,10 +175,12 @@ export class AuthService {
       tokens.refreshToken,
     );
 
+    const cutoff = this.sessionCutoff();
     const won = await this.usersRepository.rotateRefreshTokenHash(
       user.id,
       user.refreshTokenHash,
       newRefreshTokenHash,
+      cutoff,
     );
 
     if (!won) {
@@ -183,6 +214,12 @@ export class AuthService {
     presentedToken: string,
   ): Promise<never> {
     const user = await this.usersRepository.findById(userId);
+    if (
+      user?.refreshTokenHash &&
+      this.isSessionExpired(user, this.sessionCutoff())
+    ) {
+      return this.rejectExpiredSession(userId);
+    }
 
     const matchesDisplaced =
       !!user?.displacedRefreshTokenHash &&

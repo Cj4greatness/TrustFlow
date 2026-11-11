@@ -25,6 +25,21 @@ export const envValidationSchema = Joi.object({
   JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
+  SESSION_MAX_LIFETIME_DAYS: Joi.number()
+    .integer()
+    .min(1)
+    .max(365)
+    .default(30)
+    .messages({
+      'number.base':
+        'SESSION_MAX_LIFETIME_DAYS must be an integer between 1 and 365',
+      'number.integer':
+        'SESSION_MAX_LIFETIME_DAYS must be an integer between 1 and 365',
+      'number.min':
+        'SESSION_MAX_LIFETIME_DAYS must be an integer between 1 and 365',
+      'number.max':
+        'SESSION_MAX_LIFETIME_DAYS must be an integer between 1 and 365',
+    }),
 
   // Optional: if unset, the AI Gateway falls back to a placeholder
   // provider that fails loud on use rather than silently no-op'ing.

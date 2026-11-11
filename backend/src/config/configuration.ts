@@ -26,6 +26,9 @@ export interface AppConfig {
     refreshSecret: string;
     refreshExpiresIn: string;
   };
+  session: {
+    maxLifetimeDays: number;
+  };
   ai: {
     anthropic: {
       /** Optional — if unset, the AI Gateway falls back to a safe placeholder provider that fails loud on use rather than silently no-op'ing. */
@@ -54,6 +57,9 @@ export default (): AppConfig => ({
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
     refreshSecret: process.env.JWT_REFRESH_SECRET!,
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+  },
+  session: {
+    maxLifetimeDays: Number(process.env.SESSION_MAX_LIFETIME_DAYS ?? 30),
   },
   ai: {
     anthropic: {
