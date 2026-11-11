@@ -209,6 +209,36 @@ export class OrdersService {
     await ordersRepo.save(order);
   }
 
+  private async lockOrderForItemEdit(
+    ordersRepo: ReturnType<OrdersRepository['withTransaction']>,
+    orderId: string,
+    organizationId: string,
+  ): Promise<Order> {
+    const lockedOrder = await ordersRepo.findByIdForUpdate(orderId);
+    if (!lockedOrder || lockedOrder.organizationId !== organizationId) {
+      throw new NotFoundException('Order not found in this organization');
+    }
+
+    return lockedOrder;
+  }
+
+  private async getOwnedItemTxOrThrow(
+    orderItemsRepo: ReturnType<OrderItemsRepository['withTransaction']>,
+    organizationId: string,
+    orderId: string,
+    itemId: string,
+  ): Promise<OrderItem> {
+    const item = await orderItemsRepo.findById(itemId);
+    if (
+      !item ||
+      item.organizationId !== organizationId ||
+      item.orderId !== orderId
+    ) {
+      throw new NotFoundException('Order item not found for this order');
+    }
+    return item;
+  }
+
   async addOrderItem(
     organizationId: string,
     orderId: string,
@@ -231,6 +261,16 @@ export class OrdersService {
     return this.dataSource.transaction(async (manager) => {
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const lockedOrder = await this.lockOrderForItemEdit(
+        ordersRepo,
+        orderId,
+        organizationId,
+      );
+      if (lockedOrder.status !== OrderStatus.DRAFT) {
+        throw new BadRequestException(
+          'Items can only be added while the order is DRAFT',
+        );
+      }
 
       const item = orderItemsRepo.create({
         organizationId,
@@ -244,7 +284,11 @@ export class OrdersService {
       });
       const saved = await orderItemsRepo.save(item);
 
-      await this.recalculateOrderTotalsTx(orderItemsRepo, ordersRepo, order);
+      await this.recalculateOrderTotalsTx(
+        orderItemsRepo,
+        ordersRepo,
+        lockedOrder,
+      );
       return saved;
     });
   }
@@ -285,21 +329,37 @@ export class OrdersService {
         'Items can only be updated while the order is DRAFT',
       );
     }
-    const item = await this.getOwnedItemOrThrow(
-      organizationId,
-      orderId,
-      itemId,
-    );
+    await this.getOwnedItemOrThrow(organizationId, orderId, itemId);
 
     return this.dataSource.transaction(async (manager) => {
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const lockedOrder = await this.lockOrderForItemEdit(
+        ordersRepo,
+        orderId,
+        organizationId,
+      );
+      if (lockedOrder.status !== OrderStatus.DRAFT) {
+        throw new BadRequestException(
+          'Items can only be updated while the order is DRAFT',
+        );
+      }
+      const item = await this.getOwnedItemTxOrThrow(
+        orderItemsRepo,
+        organizationId,
+        orderId,
+        itemId,
+      );
 
       item.quantity = dto.quantity;
       item.subtotal = (Number(item.unitPrice) * dto.quantity).toFixed(2);
       const saved = await orderItemsRepo.save(item);
 
-      await this.recalculateOrderTotalsTx(orderItemsRepo, ordersRepo, order);
+      await this.recalculateOrderTotalsTx(
+        orderItemsRepo,
+        ordersRepo,
+        lockedOrder,
+      );
       return saved;
     });
   }
@@ -320,9 +380,29 @@ export class OrdersService {
     await this.dataSource.transaction(async (manager) => {
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const lockedOrder = await this.lockOrderForItemEdit(
+        ordersRepo,
+        orderId,
+        organizationId,
+      );
+      if (lockedOrder.status !== OrderStatus.DRAFT) {
+        throw new BadRequestException(
+          'Items can only be removed while the order is DRAFT',
+        );
+      }
+      await this.getOwnedItemTxOrThrow(
+        orderItemsRepo,
+        organizationId,
+        orderId,
+        itemId,
+      );
 
       await orderItemsRepo.hardDelete(itemId);
-      await this.recalculateOrderTotalsTx(orderItemsRepo, ordersRepo, order);
+      await this.recalculateOrderTotalsTx(
+        orderItemsRepo,
+        ordersRepo,
+        lockedOrder,
+      );
     });
   }
 
