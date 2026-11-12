@@ -96,10 +96,12 @@ export class OrganizationMembersController {
   async transferOwnership(
     @Param('id', ParseUUIDPipe) organizationId: string,
     @Body() dto: TransferOwnershipDto,
+    @Req() req: RequestWithUser,
   ): Promise<void> {
     await this.organizationMembersService.transferOwnership(
       organizationId,
       dto.newOwnerMemberId,
+      req.user.id,
     );
   }
 

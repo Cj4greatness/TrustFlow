@@ -11,12 +11,14 @@ import { OrganizationRole } from './entities/organization-member.entity';
 import { MemberResponseDto } from './dto/member-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { UserStatus } from '../users/entities/user.entity';
+import { AuditLogService } from '../audit/audit-log.service';
 
 @Injectable()
 export class OrganizationMembersService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly organizationMembersRepository: OrganizationMembersRepository,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listMembers(organizationId: string): Promise<MemberResponseDto[]> {
@@ -172,13 +174,25 @@ export class OrganizationMembersService {
         });
       }
 
-      await memberRepo.update(memberId, { role: newRole });
+      if (target.role !== newRole) {
+        await memberRepo.update(memberId, { role: newRole });
+        await this.auditLogService.recordRoleChange(manager, {
+          actorUserId,
+          targetUserId: target.userId,
+          targetMemberId: target.id,
+          organizationId,
+          previousRole: target.role,
+          newRole,
+          operation: 'update_role',
+        });
+      }
     });
   }
 
   async transferOwnership(
     organizationId: string,
     newOwnerMemberId: string,
+    actorUserId: string,
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const memberRepo =
@@ -220,6 +234,24 @@ export class OrganizationMembersService {
         role: OrganizationRole.ADMIN,
       });
       await memberRepo.update(newOwner.id, { role: OrganizationRole.OWNER });
+      await this.auditLogService.recordRoleChange(manager, {
+        actorUserId,
+        targetUserId: currentOwner.userId,
+        targetMemberId: currentOwner.id,
+        organizationId,
+        previousRole: OrganizationRole.OWNER,
+        newRole: OrganizationRole.ADMIN,
+        operation: 'transfer_ownership',
+      });
+      await this.auditLogService.recordRoleChange(manager, {
+        actorUserId,
+        targetUserId: newOwner.userId,
+        targetMemberId: newOwner.id,
+        organizationId,
+        previousRole: newOwner.role,
+        newRole: OrganizationRole.OWNER,
+        operation: 'transfer_ownership',
+      });
     });
   }
 
