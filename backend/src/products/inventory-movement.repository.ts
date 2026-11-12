@@ -11,6 +11,11 @@ export interface PaginatedInventoryMovements {
   totalPages: number;
 }
 
+interface TransactionalInventoryMovementRepository {
+  create(data: Partial<InventoryMovement>): InventoryMovement;
+  save(movement: InventoryMovement): Promise<InventoryMovement>;
+}
+
 @Injectable()
 export class InventoryMovementRepository {
   constructor(
@@ -54,7 +59,10 @@ export class InventoryMovementRepository {
    * update, matching InventoryMovement's append-only, audit-trail
    * design intent.
    */
-  withTransaction(manager: EntityManager) {
+  withTransaction(
+    this: void,
+    manager: EntityManager,
+  ): TransactionalInventoryMovementRepository {
     const transactionalRepo = manager.getRepository(InventoryMovement);
     return {
       create: (data: Partial<InventoryMovement>) =>
