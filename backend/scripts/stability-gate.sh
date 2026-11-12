@@ -50,6 +50,12 @@ while (($#)); do
   esac
 done
 
+TEST_OVERRIDE_USED=false
+if [[ ${STABILITY_GATE_TEST_CMD+x} ]]; then
+  TEST_OVERRIDE_USED=true
+  printf '\n!!! WARNING: STABILITY_GATE_TEST_CMD IS SET. THIS RUN IS TEST-ONLY AND CAN NEVER PASS THE GATE. !!!\n\n' >&2
+fi
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 BACKEND_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 [[ "$(pwd -P)" == "$BACKEND_DIR" ]] || fail_preflight 'run this script from backend/'
@@ -126,7 +132,8 @@ write_summary() {
   node - "$OUTPUT_DIR" "$MODE" "$TARGET_RUNS" "$CONSECUTIVE_PASSES" \
     "$TOTAL_RUNS" "$GIT_SHA" "$GIT_BRANCH" "$WORKTREE_STATE" \
     "$NODE_VERSION" "$PNPM_VERSION" "$OS_DESCRIPTION" "$START_UTC" \
-    "$END_UTC" "$RUN_STATE" "$GATE_RESULT" "$RUN_RECORDS" <<'NODE'
+    "$END_UTC" "$RUN_STATE" "$GATE_RESULT" "$TEST_OVERRIDE_USED" \
+    "$RUN_RECORDS" <<'NODE'
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -146,6 +153,7 @@ const [
   endTimeUtc,
   state,
   result,
+  testOverride,
   recordsPath,
 ] = process.argv.slice(2);
 
@@ -201,6 +209,7 @@ const summary = {
   endTimeUtc,
   state,
   result,
+  testOverride: testOverride === 'true',
   runs: records,
 };
 
@@ -218,6 +227,7 @@ const markdown = [
   `- Node: ${nodeVersion}`,
   `- pnpm: ${pnpmVersion}`,
   `- OS: ${os}`,
+  `- Test override: ${testOverride === 'true' ? 'yes' : 'no'}`,
   `- Started (UTC): ${startTimeUtc}`,
   `- Ended (UTC): ${endTimeUtc}`,
   `- Status: ${state}`,
@@ -306,7 +316,7 @@ while ((CONSECUTIVE_PASSES < TARGET_RUNS)); do
     exit_code=125
     printf 'Redis flush failed; test command was not run.\n' >> "$log_path"
   else
-    if [[ -n "${STABILITY_GATE_TEST_CMD:-}" ]]; then
+    if [[ "$TEST_OVERRIDE_USED" == true ]]; then
       printf 'Test-only override: STABILITY_GATE_TEST_CMD\n' >> "$log_path"
       STABILITY_GATE_RUN_NUMBER="$run_number" bash -c "$STABILITY_GATE_TEST_CMD" >> "$log_path" 2>&1
       exit_code=$?
@@ -374,6 +384,9 @@ if ((CONSECUTIVE_PASSES >= TARGET_RUNS && FAILURE_COUNT == 0)); then
   GATE_RESULT='GATE PASSED'
 else
   GATE_RESULT='GATE NOT PASSED'
+fi
+if [[ "$TEST_OVERRIDE_USED" == true ]]; then
+  GATE_RESULT='GATE NOT PASSED (TEST OVERRIDE USED, NOT VALID EVIDENCE)'
 fi
 
 printf '%s\n' "$GATE_RESULT"

@@ -28,10 +28,13 @@ Preflight requires the exact Node patch pinned by both `backend/package.json`
 and the root `.nvmrc`, the pinned pnpm version, and running Redis and Postgres
 Compose services. It records—but does not require—a clean worktree.
 
-`STABILITY_GATE_TEST_CMD` is a test-only hook for validating runner failure
-handling; do not use it for an actual gate. The command runs instead of Jest
-after the normal Redis flush, with `STABILITY_GATE_RUN_NUMBER` set for each
-attempt. For example, this fake command fails only on attempt 2:
+`STABILITY_GATE_TEST_CMD` is only for testing the runner itself and must never
+be used for an actual gate. If this variable is set at all, the runner prints a
+warning, records `testOverride: true` and `Test override: yes`, exits
+non-zero, and cannot produce a passing gate—even if every overridden command
+succeeds. The command runs instead of Jest after the normal Redis flush, with
+`STABILITY_GATE_RUN_NUMBER` set for each attempt. For example, this fake
+command fails only on attempt 2:
 
 ```bash
 STABILITY_GATE_TEST_CMD='test "$STABILITY_GATE_RUN_NUMBER" -ne 2' \
