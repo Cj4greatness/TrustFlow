@@ -10,29 +10,31 @@ export type NavItem = {
   href: string;
   /** Permission needed to see the item. Absent means every member sees it. */
   permission?: Permission;
-  /** False until the page exists, so the sidebar never links to a 404. */
+  /** False until the page exists: shown as a disabled "Soon" entry, no link. */
   ready: boolean;
 };
 
+export type NavSectionId =
+  "overview" | "business" | "commerce" | "management" | "communication";
+
 export type NavSection = {
-  id: "main" | "settings";
-  label: string | null;
+  id: NavSectionId;
+  label: string;
   items: readonly NavItem[];
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
-    id: "main",
-    label: null,
+    id: "overview",
+    label: "Overview",
     items: [
       { id: "dashboard", label: "Dashboard", href: "/dashboard", ready: true },
-      {
-        id: "orders",
-        label: "Orders",
-        href: "/orders",
-        permission: "order:read",
-        ready: false,
-      },
+    ],
+  },
+  {
+    id: "business",
+    label: "Business",
+    items: [
       {
         id: "customers",
         label: "Customers",
@@ -45,6 +47,40 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Products",
         href: "/products",
         permission: "product:read",
+        ready: false,
+      },
+      {
+        id: "inventory",
+        label: "Inventory",
+        href: "/inventory",
+        permission: "inventory:read",
+        ready: false,
+      },
+      {
+        id: "suppliers",
+        label: "Suppliers",
+        href: "/suppliers",
+        permission: "supplier:read",
+        ready: false,
+      },
+    ],
+  },
+  {
+    id: "commerce",
+    label: "Commerce",
+    items: [
+      {
+        id: "orders",
+        label: "Orders",
+        href: "/orders",
+        permission: "order:read",
+        ready: false,
+      },
+      {
+        id: "payments",
+        label: "Payments",
+        href: "/payments",
+        permission: "payment:read",
         ready: false,
       },
       {
@@ -62,13 +98,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ready: false,
       },
       {
-        id: "suppliers",
-        label: "Suppliers",
-        href: "/suppliers",
-        permission: "supplier:read",
-        ready: false,
-      },
-      {
         id: "deliveries",
         label: "Deliveries",
         href: "/deliveries",
@@ -78,8 +107,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    id: "settings",
-    label: "Settings",
+    id: "management",
+    label: "Management",
     items: [
       {
         id: "team",
@@ -89,17 +118,29 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ready: false,
       },
       {
-        id: "organization",
-        label: "Organization",
-        href: "/organization",
-        permission: "organization:view",
+        id: "roles",
+        label: "Roles",
+        href: "/roles",
+        permission: "member:view",
         ready: false,
       },
       {
-        id: "receipt-settings",
-        label: "Receipt settings",
-        href: "/receipt-settings",
-        permission: "receipt_settings:read",
+        id: "settings",
+        label: "Settings",
+        href: "/settings",
+        permission: "organization:view",
+        ready: false,
+      },
+    ],
+  },
+  {
+    id: "communication",
+    label: "Communication",
+    items: [
+      {
+        id: "communication-hub",
+        label: "Communication Hub",
+        href: "/communication",
         ready: false,
       },
     ],
@@ -108,7 +149,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
 
 /**
  * The sections a person with this role should see. An unknown or missing role
- * sees nothing. Pages that are not built yet are left out unless asked for.
+ * sees nothing. Pages that are not built yet are left out unless asked for
+ * (the shell asks for them and shows them as disabled "Soon" entries).
  */
 export function visibleNavigation(
   role: string | null | undefined,

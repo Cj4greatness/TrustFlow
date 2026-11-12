@@ -16,7 +16,7 @@ describe("visibleNavigation", () => {
   it("shows only built pages by default", () => {
     const sections = visibleNavigation("owner");
     expect(idsOf(sections)).toEqual(["dashboard"]);
-    expect(sections.map((section) => section.id)).toEqual(["main"]);
+    expect(sections.map((section) => section.id)).toEqual(["overview"]);
   });
 
   it("shows the owner every item, in order, when planned pages are included", () => {
@@ -44,12 +44,32 @@ describe("visibleNavigation", () => {
       }
     }
     expect(visibleNavigation("viewer").map((section) => section.id)).toEqual([
-      "main",
+      "overview",
     ]);
+  });
+
+  it("shows the Communication Hub to every role, as a planned item", () => {
+    const hub = allItems.find((item) => item.id === "communication-hub");
+    expect(hub?.permission).toBeUndefined();
+    expect(hub?.ready).toBe(false);
+    for (const role of ROLES) {
+      const ids = idsOf(visibleNavigation(role, { includePlanned: true }));
+      expect(ids).toContain("communication-hub");
+    }
   });
 });
 
 describe("NAV_SECTIONS", () => {
+  it("follows the approved grouping", () => {
+    expect(NAV_SECTIONS.map((section) => section.id)).toEqual([
+      "overview",
+      "business",
+      "commerce",
+      "management",
+      "communication",
+    ]);
+  });
+
   it("has unique ids and root-relative hrefs", () => {
     const ids = allItems.map((item) => item.id);
     const hrefs = allItems.map((item) => item.href);
