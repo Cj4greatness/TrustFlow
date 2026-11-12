@@ -125,13 +125,13 @@ export class OrganizationMembersService {
       );
 
       if (
-        target.role === OrganizationRole.ADMIN &&
-        actor?.role !== OrganizationRole.OWNER
+        !actor ||
+        (actor.role !== OrganizationRole.OWNER &&
+          actor.role !== OrganizationRole.ADMIN)
       ) {
-        throw new ForbiddenException({
-          message: "Only the organization owner may change an Admin's role",
-          code: 'ADMIN_CANNOT_MODIFY_ADMIN',
-        });
+        throw new ForbiddenException(
+          'Your role does not have permission to change member roles',
+        );
       }
 
       if (
@@ -141,6 +141,35 @@ export class OrganizationMembersService {
         throw new BadRequestException(
           'Use the ownership transfer action to change the Owner role',
         );
+      }
+
+      if (
+        newRole === OrganizationRole.ADMIN &&
+        actor.role !== OrganizationRole.OWNER
+      ) {
+        throw new ForbiddenException({
+          message: 'Only the organization owner may promote a member to Admin',
+          code: 'ADMIN_PROMOTION_OWNER_ONLY',
+        });
+      }
+
+      const isAdminSelfDemotion =
+        actor.id === target.id &&
+        actor.role === OrganizationRole.ADMIN &&
+        target.role === OrganizationRole.ADMIN &&
+        (newRole === OrganizationRole.MANAGER ||
+          newRole === OrganizationRole.STAFF ||
+          newRole === OrganizationRole.VIEWER);
+
+      if (
+        target.role === OrganizationRole.ADMIN &&
+        actor.role !== OrganizationRole.OWNER &&
+        !isAdminSelfDemotion
+      ) {
+        throw new ForbiddenException({
+          message: "Only the organization owner may change an Admin's role",
+          code: 'ADMIN_CANNOT_MODIFY_ADMIN',
+        });
       }
 
       await memberRepo.update(memberId, { role: newRole });
