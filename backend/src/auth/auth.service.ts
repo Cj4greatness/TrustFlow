@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -8,7 +9,7 @@ import { PasswordService } from '../security/password.service';
 import { TokenService } from './services/token.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { User } from '../users/entities/user.entity';
+import { User, UserStatus } from '../users/entities/user.entity';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthResponse } from './types/auth-response.type';
 import { JwtPayload } from './types/jwt-payload.type';
@@ -85,6 +86,13 @@ export class AuthService {
 
     if (!user || !passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException({
+        message: 'Account is not active',
+        code: 'ACCOUNT_NOT_ACTIVE',
+      });
     }
 
     await this.usersRepository.updateLastLogin(user.id);
