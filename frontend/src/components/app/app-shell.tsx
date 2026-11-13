@@ -20,11 +20,56 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function SidebarHeader({ name }: { name: string }) {
+function roleLabel(role: string | null | undefined): string {
+  return role ? role.charAt(0).toUpperCase() + role.slice(1) : "";
+}
+
+function SidebarBrand() {
   return (
-    <div className="px-3">
-      <p className="text-lg font-semibold text-primary">TrustFlow</p>
-      <p className="truncate text-xs text-muted-foreground">{name}</p>
+    <div className="flex min-w-0 items-center gap-3">
+      <span
+        aria-hidden="true"
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
+      >
+        TF
+      </span>
+      <div className="min-w-0">
+        <p className="text-base font-semibold leading-tight text-primary">
+          TrustFlow
+        </p>
+        <p className="truncate text-[11px] leading-tight text-muted-foreground">
+          Business Operating System
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SidebarOrgCard({ name }: { name: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-background px-3 py-2">
+      <p className="truncate text-sm font-semibold">{name}</p>
+      <p className="text-xs text-muted-foreground">Active organization</p>
+    </div>
+  );
+}
+
+function SidebarUser({ firstName, role }: { firstName: string; role: string }) {
+  if (!firstName) return null;
+  return (
+    <div className="flex items-center gap-3 border-t border-border p-4">
+      <span
+        aria-hidden="true"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+      >
+        {firstName.charAt(0).toUpperCase()}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{firstName}</p>
+        {role ? (
+          <p className="truncate text-xs text-muted-foreground">{role}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -49,20 +94,21 @@ function SidebarNav({
             {section.items.map((item) => {
               const Icon = iconFor(item.id);
               const base =
-                "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm";
+                "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm";
               if (!item.ready) {
                 return (
                   <li key={item.id}>
                     <span
                       aria-disabled="true"
+                      title={item.label}
                       className={cn(
                         base,
                         "cursor-not-allowed text-muted-foreground",
                       )}
                     >
                       <Icon className="size-4 shrink-0" aria-hidden="true" />
-                      <span className="flex-1">{item.label}</span>
-                      <span className="rounded-full bg-muted/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/80">
+                      <span className="flex-1 truncate">{item.label}</span>
+                      <span className="shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/80">
                         Soon
                       </span>
                     </span>
@@ -97,6 +143,56 @@ function SidebarNav({
   );
 }
 
+// One layout for the desktop sidebar and the mobile drawer: brand and
+// organization on top, a scrolling menu in the middle, the signed-in person
+// pinned at the bottom.
+function SidebarContent({
+  orgName,
+  firstName,
+  role,
+  sections,
+  pathname,
+  onNavigate,
+  onClose,
+}: {
+  orgName: string;
+  firstName: string;
+  role: string;
+  sections: readonly NavSection[];
+  pathname: string;
+  onNavigate: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-3 p-4 pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <SidebarBrand />
+          {onClose ? (
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={onClose}
+              className="rounded-md p-1.5 hover:bg-muted"
+            >
+              <X className="size-5" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <SidebarOrgCard name={orgName} />
+      </div>
+      <div className="slim-scrollbar flex-1 overflow-y-auto px-3 pb-4">
+        <SidebarNav
+          sections={sections}
+          pathname={pathname}
+          onNavigate={onNavigate}
+        />
+      </div>
+      <SidebarUser firstName={firstName} role={role} />
+    </>
+  );
+}
+
 export function AppShell({
   banner,
   children,
@@ -123,13 +219,16 @@ export function AppShell({
 
   const sections = visibleNavigation(org.role, { includePlanned: true });
   const firstName = auth.status === "authenticated" ? auth.user.firstName : "";
+  const role = roleLabel(org.role);
   const closeMenu = () => setMenuOpen(false);
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-card p-4 slim-scrollbar md:sticky md:top-0 md:flex md:h-screen">
-        <SidebarHeader name={org.organization.name} />
-        <SidebarNav
+      <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-card md:sticky md:top-0 md:flex md:h-screen">
+        <SidebarContent
+          orgName={org.organization.name}
+          firstName={firstName}
+          role={role}
           sections={sections}
           pathname={pathname}
           onNavigate={closeMenu}
@@ -148,23 +247,16 @@ export function AppShell({
             role="dialog"
             aria-modal="true"
             aria-label="Menu"
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col gap-6 overflow-y-auto bg-card p-4 shadow-lg"
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col bg-card shadow-lg"
           >
-            <div className="flex items-start justify-between gap-2">
-              <SidebarHeader name={org.organization.name} />
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={closeMenu}
-                className="rounded-md p-1.5 hover:bg-muted"
-              >
-                <X className="size-5" aria-hidden="true" />
-              </button>
-            </div>
-            <SidebarNav
+            <SidebarContent
+              orgName={org.organization.name}
+              firstName={firstName}
+              role={role}
               sections={sections}
               pathname={pathname}
               onNavigate={closeMenu}
+              onClose={closeMenu}
             />
           </aside>
         </div>
