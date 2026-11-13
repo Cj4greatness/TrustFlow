@@ -39,17 +39,17 @@ function SidebarNav({
   onNavigate: () => void;
 }) {
   return (
-    <nav aria-label="Main" className="flex flex-col gap-5">
+    <nav aria-label="Main" className="flex flex-col gap-4">
       {sections.map((section) => (
         <div key={section.id} className="flex flex-col gap-1">
-          <p className="px-3 text-xs font-medium text-muted-foreground">
+          <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             {section.label}
           </p>
           <ul className="flex flex-col gap-0.5">
             {section.items.map((item) => {
               const Icon = iconFor(item.id);
               const base =
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm";
+                "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm";
               if (!item.ready) {
                 return (
                   <li key={item.id}>
@@ -62,7 +62,7 @@ function SidebarNav({
                     >
                       <Icon className="size-4 shrink-0" aria-hidden="true" />
                       <span className="flex-1">{item.label}</span>
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                      <span className="rounded-full bg-muted/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/80">
                         Soon
                       </span>
                     </span>
@@ -127,7 +127,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-card p-4 md:sticky md:top-0 md:flex md:h-screen">
+      <aside className="hidden w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-card p-4 [scrollbar-width:thin] md:sticky md:top-0 md:flex md:h-screen">
         <SidebarHeader name={org.organization.name} />
         <SidebarNav
           sections={sections}
