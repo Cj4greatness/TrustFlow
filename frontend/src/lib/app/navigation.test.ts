@@ -142,3 +142,20 @@ describe("breadcrumbsFor", () => {
     ]);
   });
 });
+
+describe("breadcrumbsFor with a current page label", () => {
+  it("links the section and ends at the labelled page below it", () => {
+    expect(breadcrumbsFor("/customers/new", "Add customer")).toEqual([
+      { label: "TrustFlow", href: "/dashboard" },
+      { label: "Customers", href: "/customers" },
+      { label: "Add customer" },
+    ]);
+  });
+
+  it("ignores the label on the section page itself", () => {
+    expect(breadcrumbsFor("/customers", "Add customer")).toEqual([
+      { label: "TrustFlow", href: "/dashboard" },
+      { label: "Customers" },
+    ]);
+  });
+});

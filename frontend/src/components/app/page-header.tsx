@@ -8,18 +8,21 @@ import { breadcrumbsFor } from "@/lib/app/navigation";
 /**
  * The header every page in the app uses: breadcrumbs, title, a short
  * description and an optional primary action. Keeping it in one place is what
- * makes the modules feel like one product.
+ * makes the modules feel like one product. `current` names a page below a
+ * section (for example "Add customer") so the breadcrumb can end on it.
  */
 export function PageHeader({
   title,
   description,
   action,
+  current,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  current?: string;
 }) {
-  const crumbs = breadcrumbsFor(usePathname());
+  const crumbs = breadcrumbsFor(usePathname(), current);
   return (
     <div className="flex flex-col gap-3">
       <nav aria-label="Breadcrumb">
