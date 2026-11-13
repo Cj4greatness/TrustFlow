@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { can, PERMISSIONS, ROLES } from "../auth/permissions";
-import { breadcrumbsFor, NAV_SECTIONS, visibleNavigation } from "./navigation";
+import { can, PERMISSIONS, ROLES, type Role } from "../auth/permissions";
+import {
+  breadcrumbsFor,
+  NAV_SECTIONS,
+  visibleNavigation,
+  type NavItem,
+} from "./navigation";
 
 const allItems = NAV_SECTIONS.flatMap((section) => section.items);
 const idsOf = (sections: ReturnType<typeof visibleNavigation>) =>
   sections.flatMap((section) => section.items.map((item) => item.id));
+const canSee = (role: Role, item: NavItem) =>
+  item.permission === undefined || can(role, item.permission);
 
 describe("visibleNavigation", () => {
   it("shows nothing without a valid role", () => {
@@ -13,10 +20,13 @@ describe("visibleNavigation", () => {
     }
   });
 
-  it("shows only built pages by default", () => {
-    const sections = visibleNavigation("owner");
-    expect(idsOf(sections)).toEqual(["dashboard"]);
-    expect(sections.map((section) => section.id)).toEqual(["overview"]);
+  it("shows only built pages the role may see by default", () => {
+    for (const role of ROLES) {
+      const expected = allItems
+        .filter((item) => item.ready && canSee(role, item))
+        .map((item) => item.id);
+      expect(idsOf(visibleNavigation(role)), role).toEqual(expected);
+    }
   });
 
   it("shows the owner every item, in order, when planned pages are included", () => {
@@ -30,9 +40,9 @@ describe("visibleNavigation", () => {
         idsOf(visibleNavigation(role, { includePlanned: true })),
       );
       for (const item of allItems) {
-        const allowed =
-          item.permission === undefined || can(role, item.permission);
-        expect(shown.has(item.id), `${role} / ${item.id}`).toBe(allowed);
+        expect(shown.has(item.id), `${role} / ${item.id}`).toBe(
+          canSee(role, item),
+        );
       }
     }
   });
@@ -42,10 +52,25 @@ describe("visibleNavigation", () => {
       for (const section of visibleNavigation(role, { includePlanned: true })) {
         expect(section.items.length).toBeGreaterThan(0);
       }
+      for (const section of visibleNavigation(role)) {
+        expect(section.items.length).toBeGreaterThan(0);
+      }
     }
-    expect(visibleNavigation("viewer").map((section) => section.id)).toEqual([
-      "overview",
-    ]);
+  });
+
+  it("shows the dashboard to every role, as a built page", () => {
+    const dashboard = allItems.find((item) => item.id === "dashboard");
+    expect(dashboard?.ready).toBe(true);
+    expect(dashboard?.permission).toBeUndefined();
+    for (const role of ROLES) {
+      expect(idsOf(visibleNavigation(role))).toContain("dashboard");
+    }
+  });
+
+  it("builds the customers page and asks for customer:read", () => {
+    const customers = allItems.find((item) => item.id === "customers");
+    expect(customers?.ready).toBe(true);
+    expect(customers?.permission).toBe("customer:read");
   });
 
   it("shows Audit Logs only to roles that can update the organization", () => {

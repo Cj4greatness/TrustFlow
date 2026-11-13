@@ -49,7 +49,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Customers",
         href: "/customers",
         permission: "customer:read",
-        ready: false,
+        ready: true,
       },
       {
         id: "products",
