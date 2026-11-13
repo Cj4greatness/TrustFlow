@@ -127,7 +127,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-card p-4 [scrollbar-width:thin] md:sticky md:top-0 md:flex md:h-screen">
+      <aside className="hidden w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-card p-4 slim-scrollbar md:sticky md:top-0 md:flex md:h-screen">
         <SidebarHeader name={org.organization.name} />
         <SidebarNav
           sections={sections}
@@ -177,7 +177,7 @@ export function AppShell({
             aria-label="Open menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(true)}
-            className="rounded-md p-1.5 hover:bg-muted md:hidden"
+            className="-ml-2 rounded-md p-3 hover:bg-muted md:hidden"
           >
             <Menu className="size-5" aria-hidden="true" />
           </button>
@@ -190,7 +190,17 @@ export function AppShell({
           )}
           <div className="ml-auto flex items-center gap-3">
             {firstName ? (
-              <span className="hidden text-sm sm:inline">{firstName}</span>
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+                >
+                  {firstName.charAt(0).toUpperCase()}
+                </span>
+                <span className="hidden text-sm font-medium sm:inline">
+                  {firstName}
+                </span>
+              </div>
             ) : null}
             <SignOutButton />
           </div>

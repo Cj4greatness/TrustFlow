@@ -129,3 +129,14 @@
     @apply font-sans;
   }
 }
+/* Quiet scrollbar for the sidebar: thin, low contrast, no arrow buttons. */
+.slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.85 0 0) transparent;
+}
+
+/* Quiet scrollbar for the sidebar: thin, low contrast, no arrow buttons. */
+.slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.85 0 0) transparent;
+}
