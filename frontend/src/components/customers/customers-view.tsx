@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useOrg } from "@/components/app/org-provider";
 import { PageHeader } from "@/components/app/page-header";
@@ -336,6 +337,8 @@ export function CustomersView() {
   }
 
   const filtersActive = search !== "" || status !== undefined;
+  const canCreate =
+    state.status === "ready" && can(state.role, "customer:create");
 
   function clearFilters() {
     setSearchInput("");
@@ -349,6 +352,13 @@ export function CustomersView() {
       <PageHeader
         title="Customers"
         description="People and businesses you sell to."
+        action={
+          canCreate ? (
+            <Button asChild>
+              <Link href="/customers/new">Add customer</Link>
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="flex flex-col gap-3 sm:flex-row">
