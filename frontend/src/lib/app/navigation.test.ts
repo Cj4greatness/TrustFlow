@@ -48,6 +48,15 @@ describe("visibleNavigation", () => {
     ]);
   });
 
+  it("shows Audit Logs only to roles that can update the organization", () => {
+    for (const role of ROLES) {
+      const ids = idsOf(visibleNavigation(role, { includePlanned: true }));
+      expect(ids.includes("audit-logs"), role).toBe(
+        can(role, "organization:update"),
+      );
+    }
+  });
+
   it("shows the Communication Hub to every role, as a planned item", () => {
     const hub = allItems.find((item) => item.id === "communication-hub");
     expect(hub?.permission).toBeUndefined();
@@ -63,10 +72,11 @@ describe("NAV_SECTIONS", () => {
   it("follows the approved grouping", () => {
     expect(NAV_SECTIONS.map((section) => section.id)).toEqual([
       "overview",
-      "business",
-      "commerce",
-      "management",
-      "communication",
+      "business-operations",
+      "commerce-finance",
+      "growth-engagement",
+      "intelligence",
+      "administration",
     ]);
   });
 

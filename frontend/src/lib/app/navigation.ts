@@ -15,7 +15,12 @@ export type NavItem = {
 };
 
 export type NavSectionId =
-  "overview" | "business" | "commerce" | "management" | "communication";
+  | "overview"
+  | "business-operations"
+  | "commerce-finance"
+  | "growth-engagement"
+  | "intelligence"
+  | "administration";
 
 export type NavSection = {
   id: NavSectionId;
@@ -23,6 +28,10 @@ export type NavSection = {
   items: readonly NavItem[];
 };
 
+// Grouping and names follow the approved TrustFlow v1 design reference.
+// Growth and Intelligence items have no backend permission yet, so every
+// member sees them as planned entries. Audit Logs is limited to roles that
+// can update the organization until the backend defines an audit permission.
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: "overview",
@@ -32,8 +41,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    id: "business",
-    label: "Business",
+    id: "business-operations",
+    label: "Business Operations",
     items: [
       {
         id: "customers",
@@ -66,8 +75,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    id: "commerce",
-    label: "Commerce",
+    id: "commerce-finance",
+    label: "Commerce & Finance",
     items: [
       {
         id: "orders",
@@ -107,40 +116,65 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    id: "management",
-    label: "Management",
+    id: "growth-engagement",
+    label: "Growth & Engagement",
     items: [
       {
-        id: "team",
-        label: "Team",
-        href: "/team",
-        permission: "member:view",
+        id: "marketing",
+        label: "Marketing",
+        href: "/marketing",
         ready: false,
       },
       {
-        id: "roles",
-        label: "Roles",
-        href: "/roles",
-        permission: "member:view",
+        id: "communication-hub",
+        label: "Communication Hub",
+        href: "/communication",
+        ready: false,
+      },
+      { id: "crm", label: "CRM", href: "/crm", ready: false },
+    ],
+  },
+  {
+    id: "intelligence",
+    label: "Intelligence",
+    items: [
+      {
+        id: "ai-assistant",
+        label: "AI Assistant",
+        href: "/ai-assistant",
         ready: false,
       },
       {
-        id: "settings",
-        label: "Settings",
-        href: "/settings",
-        permission: "organization:view",
+        id: "business-insights",
+        label: "Business Insights",
+        href: "/insights",
         ready: false,
       },
     ],
   },
   {
-    id: "communication",
-    label: "Communication",
+    id: "administration",
+    label: "Administration",
     items: [
       {
-        id: "communication-hub",
-        label: "Communication Hub",
-        href: "/communication",
+        id: "team",
+        label: "Team & Permissions",
+        href: "/team",
+        permission: "member:view",
+        ready: false,
+      },
+      {
+        id: "settings",
+        label: "Organization Settings",
+        href: "/settings",
+        permission: "organization:view",
+        ready: false,
+      },
+      {
+        id: "audit-logs",
+        label: "Audit Logs",
+        href: "/audit-logs",
+        permission: "organization:update",
         ready: false,
       },
     ],
