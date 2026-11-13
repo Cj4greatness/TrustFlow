@@ -4,5 +4,5 @@
 export const LOGIN_PATH = "/login";
 export const REGISTER_PATH = "/register";
 
-/** Where a successful login or registration sends the user (later /dashboard). */
-export const AUTH_REDIRECT_PATH = "/";
+/** Where a successful login or registration sends the user. */
+export const AUTH_REDIRECT_PATH = "/dashboard";

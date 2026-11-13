@@ -1,13 +1,8 @@
-import { SessionStatus } from "@/components/auth/session-status";
+import { redirect } from "next/navigation";
+import { AUTH_REDIRECT_PATH } from "@/lib/auth/auth-config";
 
+// The app lives under the (app) route group. Signed-out visitors are sent to
+// /login by the gate there, so the root only needs to forward.
 export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2">
-      <h1 className="text-2xl font-semibold">
-        TrustFlow Development Environment Ready
-      </h1>
-      <p className="text-sm text-muted-foreground">Frontend is running.</p>
-      <SessionStatus />
-    </main>
-  );
+  redirect(AUTH_REDIRECT_PATH);
 }
