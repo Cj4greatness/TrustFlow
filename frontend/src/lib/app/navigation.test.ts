@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { can, PERMISSIONS, ROLES } from "../auth/permissions";
-import { NAV_SECTIONS, visibleNavigation } from "./navigation";
+import { breadcrumbsFor, NAV_SECTIONS, visibleNavigation } from "./navigation";
 
 const allItems = NAV_SECTIONS.flatMap((section) => section.items);
 const idsOf = (sections: ReturnType<typeof visibleNavigation>) =>
@@ -94,5 +94,26 @@ describe("NAV_SECTIONS", () => {
         expect(PERMISSIONS).toContain(item.permission);
       }
     }
+  });
+});
+
+describe("breadcrumbsFor", () => {
+  it("starts at TrustFlow and ends at the current page", () => {
+    expect(breadcrumbsFor("/dashboard")).toEqual([
+      { label: "TrustFlow", href: "/dashboard" },
+      { label: "Dashboard" },
+    ]);
+  });
+
+  it("matches pages below a section path", () => {
+    expect(breadcrumbsFor("/customers/42").map((crumb) => crumb.label)).toEqual(
+      ["TrustFlow", "Customers"],
+    );
+  });
+
+  it("falls back to the root crumb for an unknown path", () => {
+    expect(breadcrumbsFor("/nowhere")).toEqual([
+      { label: "TrustFlow", href: "/dashboard" },
+    ]);
   });
 });

@@ -203,3 +203,21 @@ export function visibleNavigation(
   }
   return sections;
 }
+
+export type Crumb = { label: string; href?: string };
+
+/**
+ * Breadcrumbs for a path, built from the same sections as the sidebar so the
+ * two cannot drift apart. Unknown paths get only the root crumb.
+ */
+export function breadcrumbsFor(pathname: string): Crumb[] {
+  const root: Crumb = { label: "TrustFlow", href: "/dashboard" };
+  for (const section of NAV_SECTIONS) {
+    for (const item of section.items) {
+      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+        return [root, { label: item.label }];
+      }
+    }
+  }
+  return [root];
+}

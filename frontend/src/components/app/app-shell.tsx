@@ -11,8 +11,8 @@ import {
   OrgSwitcher,
 } from "@/components/app/org-switcher";
 import { useAuth } from "@/components/auth/auth-provider";
-import { FormAlert } from "@/components/auth/form-alert";
-import { SignOutButton } from "@/components/auth/sign-out-button";
+import { Notice } from "@/components/app/notice";
+import { UserMenu } from "@/components/app/user-menu";
 import { visibleNavigation, type NavSection } from "@/lib/app/navigation";
 import { cn } from "@/lib/utils";
 
@@ -280,28 +280,13 @@ export function AppShell({
               {org.organization.name}
             </span>
           )}
-          <div className="ml-auto flex items-center gap-3">
-            {firstName ? (
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
-                >
-                  {firstName.charAt(0).toUpperCase()}
-                </span>
-                <span className="hidden text-sm font-medium sm:inline">
-                  {firstName}
-                </span>
-              </div>
-            ) : null}
-            <SignOutButton />
+          <div className="ml-auto">
+            <UserMenu firstName={firstName} role={role} />
           </div>
         </header>
         {banner === "setup" ? (
           <div className="px-4 pt-4 md:px-6">
-            <FormAlert variant="info">
-              Your organization is still being set up.
-            </FormAlert>
+            <Notice>Your organization is still being set up.</Notice>
           </div>
         ) : null}
         <main className="flex-1 p-4 md:p-6">{children}</main>
