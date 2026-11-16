@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useRef, useState, type ReactNode } from "react";
+import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { useOrg } from "@/components/app/org-provider";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
@@ -13,8 +14,10 @@ import {
 } from "@/components/customers/customers-view";
 import { useCustomer } from "@/components/customers/use-customer";
 import { Button } from "@/components/ui/button";
+import { getBrowserAuth } from "@/lib/auth/browser";
 import { can } from "@/lib/auth/permissions";
-import { customerLabel } from "@/lib/customers/customers";
+import { describeDeleteError } from "@/lib/customers/customer-delete";
+import { customerLabel, customerPath } from "@/lib/customers/customers";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -28,17 +31,24 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function CustomerDetailView() {
+  const router = useRouter();
   const { state } = useOrg();
   const params = useParams<{ customerId: string }>();
   const customerId =
     typeof params.customerId === "string" ? params.customerId : "";
   const [attempt, setAttempt] = useState(0);
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   const ready = state.status === "ready";
   const organizationId = state.status === "ready" ? state.organization.id : "";
   const allowed = state.status === "ready" && can(state.role, "customer:read");
   const canUpdate =
     state.status === "ready" && can(state.role, "customer:update");
+  const canDelete =
+    state.status === "ready" && can(state.role, "customer:delete");
   const detail = useCustomer(
     allowed && customerId !== "",
     organizationId,
@@ -47,6 +57,38 @@ export function CustomerDetailView() {
   );
 
   if (!ready) return null;
+
+  function openConfirm() {
+    setDeleteError(null);
+    setConfirming(true);
+  }
+
+  function closeConfirm() {
+    if (!deleting) setConfirming(false);
+  }
+
+  async function onDelete() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await getBrowserAuth().api.delete<unknown>(
+        customerPath(organizationId, customerId),
+      );
+      router.push("/customers");
+    } catch (error) {
+      const outcome = describeDeleteError(error);
+      if (outcome.kind === "gone") {
+        router.push("/customers");
+      } else {
+        setDeleteError(outcome.message);
+        setDeleting(false);
+      }
+    } finally {
+      inFlight.current = false;
+    }
+  }
 
   const backButton = (
     <Button asChild variant="outline" size="sm">
@@ -110,12 +152,27 @@ export function CustomerDetailView() {
         description={`${capitalize(customer.customerType)} customer`}
         current={label}
         action={
-          canUpdate ? (
-            <Button asChild>
-              <Link href={`/customers/${encodeURIComponent(customer.id)}/edit`}>
-                Edit
-              </Link>
-            </Button>
+          canUpdate || canDelete ? (
+            <div className="flex items-center gap-2">
+              {canUpdate ? (
+                <Button asChild>
+                  <Link
+                    href={`/customers/${encodeURIComponent(customer.id)}/edit`}
+                  >
+                    Edit
+                  </Link>
+                </Button>
+              ) : null}
+              {canDelete ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={openConfirm}
+                >
+                  Delete
+                </Button>
+              ) : null}
+            </div>
           ) : undefined
         }
       />
@@ -137,6 +194,26 @@ export function CustomerDetailView() {
         </dl>
       </div>
       <div>{backButton}</div>
+
+      <ConfirmDialog
+        open={confirming}
+        title={`Delete ${label}?`}
+        confirmLabel="Delete customer"
+        busyLabel="Deleting…"
+        busy={deleting}
+        error={deleteError}
+        onConfirm={onDelete}
+        onCancel={closeConfirm}
+      >
+        <p>
+          This customer will be removed from your customer lists. This cannot be
+          undone in TrustFlow.
+        </p>
+        <p>
+          If you only want to stop working with them, set their status to
+          Archived instead.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }
