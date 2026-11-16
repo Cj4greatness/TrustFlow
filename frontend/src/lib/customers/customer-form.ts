@@ -147,16 +147,6 @@ export function describeCustomerError(error: unknown): CustomerFormFailure {
     else failure.general.push(error.message);
     return failure;
   }
-  if (error.kind === "conflict") {
-    if (/email/i.test(error.message)) failure.fields.email = error.message;
-    else failure.general.push(error.message);
-    return failure;
-  }
-  if (error.kind === "conflict") {
-    if (/email/i.test(error.message)) failure.fields.email = error.message;
-    else failure.general.push(error.message);
-    return failure;
-  }
   if (error.kind === "network") {
     failure.general.push(
       `${error.message} Check the customers list before trying again.`,
