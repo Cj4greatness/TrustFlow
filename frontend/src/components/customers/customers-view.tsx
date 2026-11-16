@@ -389,7 +389,7 @@ export function CustomersView() {
             type="search"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search customers"
+            placeholder="Search by name or email"
             className={cn(FIELD, "w-full pl-9")}
           />
         </div>

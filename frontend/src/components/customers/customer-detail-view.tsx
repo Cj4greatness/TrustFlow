@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
-import { isApiError } from "@/api/errors";
+import { useState, type ReactNode } from "react";
 import { useOrg } from "@/components/app/org-provider";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
@@ -12,73 +11,10 @@ import {
   formatDate,
   StatusBadge,
 } from "@/components/customers/customers-view";
+import { useCustomer } from "@/components/customers/use-customer";
 import { Button } from "@/components/ui/button";
-import { getBrowserAuth } from "@/lib/auth/browser";
 import { can } from "@/lib/auth/permissions";
-import {
-  customerLabel,
-  customerPath,
-  parseCustomer,
-  type Customer,
-} from "@/lib/customers/customers";
-
-type DetailResult =
-  | { key: string; status: "ready"; customer: Customer }
-  | { key: string; status: "not_found" }
-  | { key: string; status: "error" };
-
-type DetailState =
-  | { status: "loading" }
-  | { status: "ready"; customer: Customer }
-  | { status: "not_found" }
-  | { status: "error" };
-
-// As in the list: the result is remembered with the exact request it belongs
-// to, which includes the organization id, so a record from another
-// organization can never be shown after a switch.
-function useCustomer(
-  enabled: boolean,
-  organizationId: string,
-  customerId: string,
-  attempt: number,
-): DetailState {
-  const path = customerPath(organizationId, customerId);
-  const key = `${path}|${attempt}`;
-  const [result, setResult] = useState<DetailResult | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const controller = new AbortController();
-    getBrowserAuth()
-      .api.get<unknown>(path, { signal: controller.signal })
-      .then((json) => {
-        if (controller.signal.aborted) return;
-        const customer = parseCustomer(json);
-        setResult(
-          customer === null
-            ? { key, status: "error" }
-            : { key, status: "ready", customer },
-        );
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult({
-          key,
-          status:
-            isApiError(error) && error.kind === "not_found"
-              ? "not_found"
-              : "error",
-        });
-      });
-    return () => controller.abort();
-  }, [enabled, key, path]);
-
-  if (result === null || result.key !== key) return { status: "loading" };
-  if (result.status === "ready") {
-    return { status: "ready", customer: result.customer };
-  }
-  return { status: result.status };
-}
+import { customerLabel } from "@/lib/customers/customers";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -101,6 +37,8 @@ export function CustomerDetailView() {
   const ready = state.status === "ready";
   const organizationId = state.status === "ready" ? state.organization.id : "";
   const allowed = state.status === "ready" && can(state.role, "customer:read");
+  const canUpdate =
+    state.status === "ready" && can(state.role, "customer:update");
   const detail = useCustomer(
     allowed && customerId !== "",
     organizationId,
@@ -171,6 +109,15 @@ export function CustomerDetailView() {
         title={label}
         description={`${capitalize(customer.customerType)} customer`}
         current={label}
+        action={
+          canUpdate ? (
+            <Button asChild>
+              <Link href={`/customers/${encodeURIComponent(customer.id)}/edit`}>
+                Edit
+              </Link>
+            </Button>
+          ) : undefined
+        }
       />
       <div className="max-w-2xl rounded-xl border border-border bg-card p-6">
         <div className="mb-5 flex items-center justify-between gap-3">
