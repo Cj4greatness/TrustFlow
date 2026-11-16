@@ -89,7 +89,7 @@ function count(value: unknown): number | null {
     : null;
 }
 
-function parseCustomer(value: unknown): Customer | null {
+export function parseCustomer(value: unknown): Customer | null {
   if (!isRecord(value)) return null;
   const id = text(value.id);
   const customerType = oneOf(CUSTOMER_TYPES, value.customerType);
@@ -147,4 +147,12 @@ export function customerLabel(customer: Customer): string {
     .filter(Boolean)
     .join(" ");
   return person || customer.companyName || customer.email || "Unnamed customer";
+}
+
+/** The URL of one customer. */
+export function customerPath(
+  organizationId: string,
+  customerId: string,
+): string {
+  return `/organizations/${encodeURIComponent(organizationId)}/customers/${encodeURIComponent(customerId)}`;
 }
