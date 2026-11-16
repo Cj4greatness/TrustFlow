@@ -134,10 +134,10 @@ describe("describeCustomerError", () => {
       new ApiError({
         kind: "conflict",
         status: 409,
-        messages: ["Email already used"],
+        messages: ["Record already exists"],
       }),
     );
-    expect(failure.general).toEqual(["Email already used"]);
+    expect(failure.general).toEqual(["Record already exists"]);
   });
 
   it("handles anything that is not an API error", () => {
