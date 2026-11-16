@@ -30,7 +30,7 @@ const STATUS_STYLES: Record<CustomerStatus, string> = {
   archived: "bg-muted text-muted-foreground",
 };
 
-function capitalize(value: string): string {
+export function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
@@ -40,7 +40,7 @@ function asStatus(value: string): CustomerStatus | undefined {
     : undefined;
 }
 
-function formatDate(iso: string | null): string {
+export function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   return Number.isNaN(date.getTime())
@@ -103,7 +103,7 @@ function useCustomerList(
     : { status: "error" };
 }
 
-function StatusBadge({ status }: { status: CustomerStatus }) {
+export function StatusBadge({ status }: { status: CustomerStatus }) {
   return (
     <span
       className={cn(
@@ -158,7 +158,14 @@ function CustomerTable({ customers }: { customers: readonly Customer[] }) {
           {customers.map((customer) => (
             <tr key={customer.id}>
               <td className="px-4 py-3">
-                <p className="font-medium">{customerLabel(customer)}</p>
+                <p className="font-medium">
+                  <Link
+                    href={`/customers/${encodeURIComponent(customer.id)}`}
+                    className="hover:underline"
+                  >
+                    {customerLabel(customer)}
+                  </Link>
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {typeLabel(customer)}
                 </p>
@@ -190,7 +197,14 @@ function CustomerCards({ customers }: { customers: readonly Customer[] }) {
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate font-medium">{customerLabel(customer)}</p>
+              <p className="truncate font-medium">
+                <Link
+                  href={`/customers/${encodeURIComponent(customer.id)}`}
+                  className="hover:underline"
+                >
+                  {customerLabel(customer)}
+                </Link>
+              </p>
               <p className="text-xs text-muted-foreground">
                 {typeLabel(customer)}
               </p>
