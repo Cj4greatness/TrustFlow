@@ -44,7 +44,7 @@ export enum InvoiceStatus {
  *  - Money: all monetary columns are `bigint` (kobo), via
  *    KoboTransformer. Diverges from Order's decimal(12,2)-as-string
  *    columns; any code reading Order.total alongside Invoice amounts
- *    MUST explicitly convert (Math.round(parseFloat(order.total) * 100)).
+ *    MUST explicitly convert the decimal string to integer minor units.
  *
  *  - Overpayment (RATIFIED): if a Payment would push amountPaid above
  *    total, the payment is still accepted and amountPaid/amountDue

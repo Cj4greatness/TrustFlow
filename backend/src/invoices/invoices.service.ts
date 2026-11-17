@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import { InvoicesRepository } from './invoices.repository';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { Order } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
+import { decimalStringToMinorUnits } from '../common/money/decimal-minor-units';
 
 /**
  * InvoicesService
@@ -41,6 +43,17 @@ export class InvoicesService {
     createdByUserId: string,
     manager: EntityManager,
   ): Promise<Invoice> {
+    const discountMagnitude = order.discount.startsWith('-')
+      ? order.discount.slice(1)
+      : order.discount;
+    if (decimalStringToMinorUnits(discountMagnitude) !== 0) {
+      throw new ConflictException({
+        message:
+          'Orders with a nonzero discount cannot be invoiced until discounts are supported',
+        code: 'ORDER_DISCOUNT_NOT_SUPPORTED',
+      });
+    }
+
     const existing = await manager.findOne(Invoice, {
       where: { orderId: order.id, organizationId: order.organizationId },
     });
@@ -64,9 +77,21 @@ export class InvoicesService {
     let subtotal = 0;
     const lineItems: InvoiceLineItem[] = [];
     for (const item of orderItems) {
-      const unitPriceKobo = this.decimalToKobo(item.unitPrice);
+      const unitPriceKobo = decimalStringToMinorUnits(item.unitPrice);
       const lineTotalKobo = unitPriceKobo * item.quantity;
-      subtotal += lineTotalKobo;
+      if (!Number.isSafeInteger(lineTotalKobo)) {
+        throw new BadRequestException(
+          'Invoice line total exceeds the supported safe integer range',
+        );
+      }
+
+      const nextSubtotal = subtotal + lineTotalKobo;
+      if (!Number.isSafeInteger(nextSubtotal)) {
+        throw new BadRequestException(
+          'Invoice subtotal exceeds the supported safe integer range',
+        );
+      }
+      subtotal = nextSubtotal;
 
       const lineItem = manager.create(InvoiceLineItem, {
         organizationId: order.organizationId,
@@ -81,7 +106,18 @@ export class InvoicesService {
 
     const discountAmount = 0;
     const taxAmount = 0;
-    const total = subtotal - discountAmount + taxAmount;
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    if (!Number.isSafeInteger(subtotalAfterDiscount)) {
+      throw new BadRequestException(
+        'Invoice total exceeds the supported safe integer range',
+      );
+    }
+    const total = subtotalAfterDiscount + taxAmount;
+    if (!Number.isSafeInteger(total)) {
+      throw new BadRequestException(
+        'Invoice total exceeds the supported safe integer range',
+      );
+    }
 
     const invoice = manager.create(Invoice, {
       organizationId: order.organizationId,
@@ -197,8 +233,23 @@ export class InvoicesService {
     paymentAmountKobo: number,
     manager: EntityManager,
   ): Promise<Invoice> {
-    invoice.amountPaid = invoice.amountPaid + paymentAmountKobo;
-    invoice.amountDue = invoice.total - invoice.amountPaid;
+    const amountPaid = invoice.amountPaid + paymentAmountKobo;
+    if (
+      !Number.isSafeInteger(paymentAmountKobo) ||
+      !Number.isSafeInteger(amountPaid)
+    ) {
+      throw new BadRequestException(
+        'Payment would exceed the supported safe integer range',
+      );
+    }
+    const amountDue = invoice.total - amountPaid;
+    if (!Number.isSafeInteger(amountDue)) {
+      throw new BadRequestException(
+        'Invoice amount due exceeds the supported safe integer range',
+      );
+    }
+    invoice.amountPaid = amountPaid;
+    invoice.amountDue = amountDue;
 
     if (invoice.amountPaid > invoice.total) {
       invoice.flaggedForReview = true;
@@ -211,16 +262,6 @@ export class InvoicesService {
     }
 
     return manager.save(Invoice, invoice);
-  }
-
-  private decimalToKobo(decimalString: string): number {
-    const kobo = Math.round(parseFloat(decimalString) * 100);
-    if (!Number.isFinite(kobo)) {
-      throw new BadRequestException(
-        `Invalid monetary value from Order: ${decimalString}`,
-      );
-    }
-    return kobo;
   }
 
   private async nextInvoiceNumber(

@@ -3,10 +3,10 @@ import { ValueTransformer } from 'typeorm';
 export class KoboTransformer implements ValueTransformer {
   to(value: number | null | undefined): number | null {
     if (value === null || value === undefined) return null;
-    if (!Number.isInteger(value)) {
+    if (!Number.isSafeInteger(value)) {
       throw new Error(
-        `KoboTransformer: expected an integer minor-unit value, got ${value}. ` +
-          `Money must never reach the database as a decimal or float.`,
+        `KoboTransformer: expected a safe integer minor-unit value, got ${value}. ` +
+          `Money must never reach the database as a decimal, float, or unsafe integer.`,
       );
     }
     return value;
