@@ -4149,15 +4149,10 @@
           "currency": {
             "type": "string",
             "enum": [
-              "NGN",
-              "USD",
-              "GHS",
-              "KES",
-              "ZAR",
-              "RWF"
+              "NGN"
             ],
             "example": "NGN",
-            "description": "3-letter ISO currency code"
+            "description": "Organization currency. Only NGN is supported in this release."
           }
         },
         "required": [

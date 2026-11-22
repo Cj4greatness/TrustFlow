@@ -7,6 +7,7 @@ import { OrganizationsController } from './organizations.controller';
 import { CommonServicesModule } from '../common/services/common-services.module';
 import { OrganizationMembersModule } from '../organization-members/organization-members.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AuthorizationModule } from '../authorization/authorization.module';
     CommonServicesModule,
     forwardRef(() => OrganizationMembersModule),
     forwardRef(() => AuthorizationModule),
+    forwardRef(() => UsersModule),
   ],
   controllers: [OrganizationsController],
   providers: [OrganizationsRepository, OrganizationsService],
