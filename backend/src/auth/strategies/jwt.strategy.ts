@@ -1,9 +1,15 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser, JwtPayload } from '../types/jwt-payload.type';
 import { UsersRepository } from '../../users/users.repository';
+import { UserStatus } from '../../users/entities/user.entity';
+import { ACCOUNT_NOT_ACTIVE_ERROR } from '../account-status';
 
 /**
  * Validates the short-lived access token sent as a Bearer header on
@@ -28,6 +34,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const user = await this.usersRepository.findById(payload.sub);
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException(ACCOUNT_NOT_ACTIVE_ERROR);
     }
 
     return {
