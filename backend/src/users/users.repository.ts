@@ -66,14 +66,15 @@ export class UsersRepository {
   }
 
   /**
-   * Persists the hash of the user's current valid refresh token, or
-   * clears it (null) on logout/revocation. Called after every
-   * successful login/register/refresh, and on logout.
+   * Persists the hash of a newly issued session (registration), or
+   * clears it (null) on logout/revocation. Login uses
+   * replaceRefreshTokenHashOnLogin() and refresh uses the CAS below.
    *
    * Also clears previousRefreshTokenHash/refreshTokenRotatedAt and
    * displacedRefreshTokenHash/displacedAt, so a logged-out session
    * can't still be recognized as "recently rotated" or "displaced"
-   * by a stale token from the old session.
+   * by a stale token from the old session. A new hash starts a fresh
+   * session lifetime; clearing the hash clears sessionStartedAt.
    */
   async updateRefreshTokenHash(
     id: string,
@@ -89,6 +90,7 @@ export class UsersRepository {
         refreshTokenRotatedAt: null,
         displacedRefreshTokenHash: null,
         displacedAt: null,
+        sessionStartedAt: refreshTokenHash === null ? null : new Date(),
       },
     );
   }
@@ -101,6 +103,7 @@ export class UsersRepository {
    * next refresh() attempt be recognized and given a clear reason
    * (SESSION_REPLACED_BY_NEW_LOGIN) instead of a generic "invalid
    * token" response indistinguishable from theft.
+   * A successful login also starts a fresh absolute session lifetime.
    *
    * Does NOT touch previousRefreshTokenHash/refreshTokenRotatedAt —
    * those serve a separate, short-lived purpose (the rotation
@@ -118,6 +121,7 @@ export class UsersRepository {
         refreshTokenHash: newRefreshTokenHash,
         displacedRefreshTokenHash: user?.refreshTokenHash ?? null,
         displacedAt: user?.refreshTokenHash ? new Date() : null,
+        sessionStartedAt: new Date(),
       },
     );
   }
@@ -138,15 +142,23 @@ export class UsersRepository {
     id: string,
     verifiedHash: string,
     newHash: string,
+    cutoff: Date,
+    manager?: EntityManager,
   ): Promise<boolean> {
-    const result = await this.repository.update(
-      { id, refreshTokenHash: verifiedHash },
-      {
+    const repository = manager?.getRepository(User) ?? this.repository;
+    const result = await repository
+      .createQueryBuilder()
+      .update(User)
+      .set({
         refreshTokenHash: newHash,
         previousRefreshTokenHash: verifiedHash,
         refreshTokenRotatedAt: new Date(),
-      },
-    );
+      })
+      .where(
+        '"id" = :id AND "refresh_token_hash" = :verifiedHash AND "session_started_at" IS NOT NULL AND "session_started_at" > :cutoff',
+        { id, verifiedHash, cutoff },
+      )
+      .execute();
 
     return (result.affected ?? 0) === 1;
   }
