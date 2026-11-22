@@ -20,6 +20,7 @@ import { InventoryService } from '../products/inventory.service';
 import { InventoryMovementType } from '../products/entities/inventory-movement.entity';
 import { InvoicesService } from '../invoices/invoices.service';
 import { DeliveriesService } from '../deliveries/deliveries.service';
+import { DeliveryStatus } from '../deliveries/entities/delivery.entity';
 import { CustomerAddress } from '../customers/entities/customer-address.entity';
 import {
   isTransitionAllowed,
@@ -546,17 +547,12 @@ export class OrdersService {
     orderId: string,
     createdByUserId: string,
   ): Promise<Order> {
-    const order = await this.getOwnedOrderOrThrow(organizationId, orderId);
-    this.assertTransitionAllowed(order, OrderStatus.CANCELLED);
+    await this.getOwnedOrderOrThrow(organizationId, orderId);
 
     return this.dataSource.transaction(async (manager) => {
       const ordersRepo = this.ordersRepository.withTransaction(manager);
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
 
-      // Lock BEFORE restoring inventory — previously the restore ran
-      // first, so two concurrent cancels could both restore, and a
-      // cancel racing processOrder() could cancel an order that had
-      // just been given a Delivery.
       const { order: lockedOrder, alreadyInTargetState } =
         await this.lockOrderForTransition(
           ordersRepo,
@@ -564,14 +560,43 @@ export class OrdersService {
           organizationId,
           OrderStatus.CANCELLED,
         );
+
+      const delivery = await this.deliveriesService.lockDeliveryForOrder(
+        manager,
+        orderId,
+        organizationId,
+      );
+
       if (alreadyInTargetState) {
         return lockedOrder;
       }
 
-      // Whether inventory needs restoring is decided from the LOCKED
-      // status, not the stale pre-lock read: the order may have moved
-      // DRAFT -> CONFIRMED (now needs restore) in between.
-      if (cancellationRequiresInventoryRestore(lockedOrder.status)) {
+      if (
+        delivery &&
+        delivery.status !== DeliveryStatus.PENDING &&
+        delivery.status !== DeliveryStatus.CANCELLED
+      ) {
+        throw new BadRequestException({
+          message: `Cannot cancel order while its delivery is ${delivery.status}`,
+          code: 'ORDER_CANCEL_BLOCKED_DELIVERY_IN_PROGRESS',
+        });
+      }
+
+      if (delivery?.status === DeliveryStatus.PENDING) {
+        await this.deliveriesService.cancelPendingDeliveryInTransaction(
+          manager,
+          delivery,
+          `Order ${lockedOrder.orderNumber} cancelled`,
+        );
+      }
+
+      const requiresInventoryRestore = cancellationRequiresInventoryRestore(
+        lockedOrder.status,
+      );
+      lockedOrder.status = OrderStatus.CANCELLED;
+      const savedOrder = await ordersRepo.save(lockedOrder);
+
+      if (requiresInventoryRestore) {
         const items = await orderItemsRepo.findByOrderId(orderId);
         for (const item of items) {
           await this.inventoryService.adjustInventory(
@@ -588,8 +613,7 @@ export class OrdersService {
         }
       }
 
-      lockedOrder.status = OrderStatus.CANCELLED;
-      return ordersRepo.save(lockedOrder);
+      return savedOrder;
     });
   }
 }
