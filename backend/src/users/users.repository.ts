@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { User, UserStatus } from './entities/user.entity';
 
 /**
@@ -25,8 +25,16 @@ export class UsersRepository {
     return this.repository.save(user);
   }
 
-  findById(id: string): Promise<User | null> {
-    return this.repository.findOne({ where: { id } });
+  findById(id: string, manager?: EntityManager): Promise<User | null> {
+    const repository = manager?.getRepository(User) ?? this.repository;
+    return repository.findOne({ where: { id } });
+  }
+
+  findByIdForUpdate(id: string, manager: EntityManager): Promise<User | null> {
+    return manager.getRepository(User).findOne({
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
+    });
   }
 
   findByEmail(email: string): Promise<User | null> {
@@ -71,8 +79,10 @@ export class UsersRepository {
   async updateRefreshTokenHash(
     id: string,
     refreshTokenHash: string | null,
+    manager?: EntityManager,
   ): Promise<void> {
-    await this.repository.update(
+    const repository = manager?.getRepository(User) ?? this.repository;
+    await repository.update(
       { id },
       {
         refreshTokenHash,
@@ -133,8 +143,10 @@ export class UsersRepository {
     verifiedHash: string,
     newHash: string,
     cutoff: Date,
+    manager?: EntityManager,
   ): Promise<boolean> {
-    const result = await this.repository
+    const repository = manager?.getRepository(User) ?? this.repository;
+    const result = await repository
       .createQueryBuilder()
       .update(User)
       .set({
@@ -157,8 +169,9 @@ export class UsersRepository {
    * foreign key references (e.g. OrganizationMember, AuditLog) stay
    * intact.
    */
-  async softDelete(id: string): Promise<void> {
-    await this.repository.softDelete({ id });
+  async softDelete(id: string, manager?: EntityManager): Promise<void> {
+    const repository = manager?.getRepository(User) ?? this.repository;
+    await repository.softDelete({ id });
   }
 
   async update(id: string, data: Partial<User>): Promise<User | null> {

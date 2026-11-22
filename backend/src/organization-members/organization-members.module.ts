@@ -18,7 +18,7 @@ import { AuthorizationModule } from '../authorization/authorization.module';
     TypeOrmModule.forFeature([OrganizationMember, Invitation]),
     EmailModule,
     forwardRef(() => OrganizationsModule),
-    UsersModule,
+    forwardRef(() => UsersModule),
     forwardRef(() => AuthorizationModule),
   ],
   controllers: [InvitationsController, OrganizationMembersController],

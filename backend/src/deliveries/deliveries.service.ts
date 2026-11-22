@@ -125,6 +125,40 @@ export class DeliveriesService {
     return this.deliveriesRepository.findAllForOrganization(organizationId);
   }
 
+  async lockDeliveryForOrder(
+    manager: EntityManager,
+    orderId: string,
+    organizationId: string,
+  ): Promise<Delivery | null> {
+    const order = await manager.getRepository(Order).findOne({
+      where: { id: orderId, organizationId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found in this organization');
+    }
+
+    return manager.getRepository(Delivery).findOne({
+      where: { orderId, organizationId },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
+  async cancelPendingDeliveryInTransaction(
+    manager: EntityManager,
+    delivery: Delivery,
+    cancellationReason: string,
+  ): Promise<Delivery> {
+    return this.transitionLockedDelivery(
+      manager,
+      delivery,
+      DeliveryStatus.CANCELLED,
+      (lockedDelivery) => {
+        lockedDelivery.cancellationReason = cancellationReason;
+      },
+    );
+  }
+
   /**
    * §27: assignment is deliberately minimal — a free-text
    * trackingReference/assignedDeliveryPerson pair, no driver entity.
@@ -135,53 +169,47 @@ export class DeliveriesService {
     organizationId: string,
     dto: AssignDeliveryDto,
   ): Promise<Delivery> {
-    const delivery = await this.deliveriesRepository.getOwnedDeliveryOrThrow(
+    return this.transitionDelivery(
       id,
       organizationId,
+      DeliveryStatus.ASSIGNED,
+      (delivery) => {
+        delivery.assignedDeliveryPerson = dto.assignedDeliveryPerson;
+        if (dto.trackingReference !== undefined) {
+          delivery.trackingReference = dto.trackingReference;
+        }
+      },
     );
-    this.assertTransitionAllowed(delivery, DeliveryStatus.ASSIGNED);
-
-    delivery.status = DeliveryStatus.ASSIGNED;
-    delivery.assignedDeliveryPerson = dto.assignedDeliveryPerson;
-    if (dto.trackingReference !== undefined) {
-      delivery.trackingReference = dto.trackingReference;
-    }
-    return this.dataSource.getRepository(Delivery).save(delivery);
   }
 
   async markPickedUp(id: string, organizationId: string): Promise<Delivery> {
-    const delivery = await this.deliveriesRepository.getOwnedDeliveryOrThrow(
+    return this.transitionDelivery(
       id,
       organizationId,
+      DeliveryStatus.PICKED_UP,
+      (delivery) => {
+        delivery.pickupAt = new Date();
+      },
     );
-    this.assertTransitionAllowed(delivery, DeliveryStatus.PICKED_UP);
-
-    delivery.status = DeliveryStatus.PICKED_UP;
-    delivery.pickupAt = new Date();
-    return this.dataSource.getRepository(Delivery).save(delivery);
   }
 
   async markInTransit(id: string, organizationId: string): Promise<Delivery> {
-    const delivery = await this.deliveriesRepository.getOwnedDeliveryOrThrow(
+    return this.transitionDelivery(
       id,
       organizationId,
+      DeliveryStatus.IN_TRANSIT,
     );
-    this.assertTransitionAllowed(delivery, DeliveryStatus.IN_TRANSIT);
-
-    delivery.status = DeliveryStatus.IN_TRANSIT;
-    return this.dataSource.getRepository(Delivery).save(delivery);
   }
 
   async markDelivered(id: string, organizationId: string): Promise<Delivery> {
-    const delivery = await this.deliveriesRepository.getOwnedDeliveryOrThrow(
+    return this.transitionDelivery(
       id,
       organizationId,
+      DeliveryStatus.DELIVERED,
+      (delivery) => {
+        delivery.deliveredAt = new Date();
+      },
     );
-    this.assertTransitionAllowed(delivery, DeliveryStatus.DELIVERED);
-
-    delivery.status = DeliveryStatus.DELIVERED;
-    delivery.deliveredAt = new Date();
-    return this.dataSource.getRepository(Delivery).save(delivery);
   }
 
   async markFailed(
@@ -189,15 +217,14 @@ export class DeliveriesService {
     organizationId: string,
     dto: FailDeliveryDto,
   ): Promise<Delivery> {
-    const delivery = await this.deliveriesRepository.getOwnedDeliveryOrThrow(
+    return this.transitionDelivery(
       id,
       organizationId,
+      DeliveryStatus.FAILED,
+      (delivery) => {
+        delivery.failureReason = dto.failureReason;
+      },
     );
-    this.assertTransitionAllowed(delivery, DeliveryStatus.FAILED);
-
-    delivery.status = DeliveryStatus.FAILED;
-    delivery.failureReason = dto.failureReason;
-    return this.dataSource.getRepository(Delivery).save(delivery);
   }
 
   async cancelDelivery(
@@ -205,15 +232,52 @@ export class DeliveriesService {
     organizationId: string,
     dto: CancelDeliveryDto,
   ): Promise<Delivery> {
+    return this.transitionDelivery(
+      id,
+      organizationId,
+      DeliveryStatus.CANCELLED,
+      (delivery) => {
+        delivery.cancellationReason = dto.cancellationReason;
+      },
+    );
+  }
+
+  private async transitionDelivery(
+    id: string,
+    organizationId: string,
+    to: DeliveryStatus,
+    update?: (delivery: Delivery) => void,
+  ): Promise<Delivery> {
     const delivery = await this.deliveriesRepository.getOwnedDeliveryOrThrow(
       id,
       organizationId,
     );
-    this.assertTransitionAllowed(delivery, DeliveryStatus.CANCELLED);
+    this.assertTransitionAllowed(delivery, to);
 
-    delivery.status = DeliveryStatus.CANCELLED;
-    delivery.cancellationReason = dto.cancellationReason;
-    return this.dataSource.getRepository(Delivery).save(delivery);
+    return this.dataSource.transaction(async (manager) => {
+      const lockedDelivery = await this.lockDeliveryForOrder(
+        manager,
+        delivery.orderId,
+        organizationId,
+      );
+      if (!lockedDelivery || lockedDelivery.id !== id) {
+        throw new NotFoundException(`Delivery ${id} not found`);
+      }
+
+      return this.transitionLockedDelivery(manager, lockedDelivery, to, update);
+    });
+  }
+
+  private transitionLockedDelivery(
+    manager: EntityManager,
+    delivery: Delivery,
+    to: DeliveryStatus,
+    update?: (delivery: Delivery) => void,
+  ): Promise<Delivery> {
+    this.assertTransitionAllowed(delivery, to);
+    delivery.status = to;
+    update?.(delivery);
+    return manager.getRepository(Delivery).save(delivery);
   }
 
   private assertTransitionAllowed(

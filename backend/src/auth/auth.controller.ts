@@ -15,7 +15,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { SkipThrottle } from '@nestjs/throttler';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -23,6 +23,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { AuthenticatedUser } from './types/jwt-payload.type';
 import { AuthThrottlerGuard } from './guards/auth-throttler.guard';
+import { getAuthClientIp } from './throttling/auth-client-ip';
 
 interface RequestWithUser extends Request {
   user: AuthenticatedUser;
@@ -73,8 +74,11 @@ export class AuthController {
     type: AuthResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+  refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
+    return this.authService.refresh(dto.refreshToken, {
+      ip: getAuthClientIp({ headers: req.headers, ip: req.ip }),
+      userAgent: req.headers['user-agent'] ?? '',
+    });
   }
 
   @Post('logout')

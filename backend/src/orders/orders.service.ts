@@ -20,6 +20,7 @@ import { InventoryService } from '../products/inventory.service';
 import { InventoryMovementType } from '../products/entities/inventory-movement.entity';
 import { InvoicesService } from '../invoices/invoices.service';
 import { DeliveriesService } from '../deliveries/deliveries.service';
+import { DeliveryStatus } from '../deliveries/entities/delivery.entity';
 import { CustomerAddress } from '../customers/entities/customer-address.entity';
 import {
   isTransitionAllowed,
@@ -209,6 +210,36 @@ export class OrdersService {
     await ordersRepo.save(order);
   }
 
+  private async lockOrderForItemEdit(
+    ordersRepo: ReturnType<OrdersRepository['withTransaction']>,
+    orderId: string,
+    organizationId: string,
+  ): Promise<Order> {
+    const lockedOrder = await ordersRepo.findByIdForUpdate(orderId);
+    if (!lockedOrder || lockedOrder.organizationId !== organizationId) {
+      throw new NotFoundException('Order not found in this organization');
+    }
+
+    return lockedOrder;
+  }
+
+  private async getOwnedItemTxOrThrow(
+    orderItemsRepo: ReturnType<OrderItemsRepository['withTransaction']>,
+    organizationId: string,
+    orderId: string,
+    itemId: string,
+  ): Promise<OrderItem> {
+    const item = await orderItemsRepo.findById(itemId);
+    if (
+      !item ||
+      item.organizationId !== organizationId ||
+      item.orderId !== orderId
+    ) {
+      throw new NotFoundException('Order item not found for this order');
+    }
+    return item;
+  }
+
   async addOrderItem(
     organizationId: string,
     orderId: string,
@@ -231,6 +262,16 @@ export class OrdersService {
     return this.dataSource.transaction(async (manager) => {
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const lockedOrder = await this.lockOrderForItemEdit(
+        ordersRepo,
+        orderId,
+        organizationId,
+      );
+      if (lockedOrder.status !== OrderStatus.DRAFT) {
+        throw new BadRequestException(
+          'Items can only be added while the order is DRAFT',
+        );
+      }
 
       const item = orderItemsRepo.create({
         organizationId,
@@ -244,7 +285,11 @@ export class OrdersService {
       });
       const saved = await orderItemsRepo.save(item);
 
-      await this.recalculateOrderTotalsTx(orderItemsRepo, ordersRepo, order);
+      await this.recalculateOrderTotalsTx(
+        orderItemsRepo,
+        ordersRepo,
+        lockedOrder,
+      );
       return saved;
     });
   }
@@ -285,21 +330,37 @@ export class OrdersService {
         'Items can only be updated while the order is DRAFT',
       );
     }
-    const item = await this.getOwnedItemOrThrow(
-      organizationId,
-      orderId,
-      itemId,
-    );
+    await this.getOwnedItemOrThrow(organizationId, orderId, itemId);
 
     return this.dataSource.transaction(async (manager) => {
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const lockedOrder = await this.lockOrderForItemEdit(
+        ordersRepo,
+        orderId,
+        organizationId,
+      );
+      if (lockedOrder.status !== OrderStatus.DRAFT) {
+        throw new BadRequestException(
+          'Items can only be updated while the order is DRAFT',
+        );
+      }
+      const item = await this.getOwnedItemTxOrThrow(
+        orderItemsRepo,
+        organizationId,
+        orderId,
+        itemId,
+      );
 
       item.quantity = dto.quantity;
       item.subtotal = (Number(item.unitPrice) * dto.quantity).toFixed(2);
       const saved = await orderItemsRepo.save(item);
 
-      await this.recalculateOrderTotalsTx(orderItemsRepo, ordersRepo, order);
+      await this.recalculateOrderTotalsTx(
+        orderItemsRepo,
+        ordersRepo,
+        lockedOrder,
+      );
       return saved;
     });
   }
@@ -320,9 +381,29 @@ export class OrdersService {
     await this.dataSource.transaction(async (manager) => {
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
       const ordersRepo = this.ordersRepository.withTransaction(manager);
+      const lockedOrder = await this.lockOrderForItemEdit(
+        ordersRepo,
+        orderId,
+        organizationId,
+      );
+      if (lockedOrder.status !== OrderStatus.DRAFT) {
+        throw new BadRequestException(
+          'Items can only be removed while the order is DRAFT',
+        );
+      }
+      await this.getOwnedItemTxOrThrow(
+        orderItemsRepo,
+        organizationId,
+        orderId,
+        itemId,
+      );
 
       await orderItemsRepo.hardDelete(itemId);
-      await this.recalculateOrderTotalsTx(orderItemsRepo, ordersRepo, order);
+      await this.recalculateOrderTotalsTx(
+        orderItemsRepo,
+        ordersRepo,
+        lockedOrder,
+      );
     });
   }
 
@@ -546,17 +627,12 @@ export class OrdersService {
     orderId: string,
     createdByUserId: string,
   ): Promise<Order> {
-    const order = await this.getOwnedOrderOrThrow(organizationId, orderId);
-    this.assertTransitionAllowed(order, OrderStatus.CANCELLED);
+    await this.getOwnedOrderOrThrow(organizationId, orderId);
 
     return this.dataSource.transaction(async (manager) => {
       const ordersRepo = this.ordersRepository.withTransaction(manager);
       const orderItemsRepo = this.orderItemsRepository.withTransaction(manager);
 
-      // Lock BEFORE restoring inventory — previously the restore ran
-      // first, so two concurrent cancels could both restore, and a
-      // cancel racing processOrder() could cancel an order that had
-      // just been given a Delivery.
       const { order: lockedOrder, alreadyInTargetState } =
         await this.lockOrderForTransition(
           ordersRepo,
@@ -564,14 +640,43 @@ export class OrdersService {
           organizationId,
           OrderStatus.CANCELLED,
         );
+
+      const delivery = await this.deliveriesService.lockDeliveryForOrder(
+        manager,
+        orderId,
+        organizationId,
+      );
+
       if (alreadyInTargetState) {
         return lockedOrder;
       }
 
-      // Whether inventory needs restoring is decided from the LOCKED
-      // status, not the stale pre-lock read: the order may have moved
-      // DRAFT -> CONFIRMED (now needs restore) in between.
-      if (cancellationRequiresInventoryRestore(lockedOrder.status)) {
+      if (
+        delivery &&
+        delivery.status !== DeliveryStatus.PENDING &&
+        delivery.status !== DeliveryStatus.CANCELLED
+      ) {
+        throw new BadRequestException({
+          message: `Cannot cancel order while its delivery is ${delivery.status}`,
+          code: 'ORDER_CANCEL_BLOCKED_DELIVERY_IN_PROGRESS',
+        });
+      }
+
+      if (delivery?.status === DeliveryStatus.PENDING) {
+        await this.deliveriesService.cancelPendingDeliveryInTransaction(
+          manager,
+          delivery,
+          `Order ${lockedOrder.orderNumber} cancelled`,
+        );
+      }
+
+      const requiresInventoryRestore = cancellationRequiresInventoryRestore(
+        lockedOrder.status,
+      );
+      lockedOrder.status = OrderStatus.CANCELLED;
+      const savedOrder = await ordersRepo.save(lockedOrder);
+
+      if (requiresInventoryRestore) {
         const items = await orderItemsRepo.findByOrderId(orderId);
         for (const item of items) {
           await this.inventoryService.adjustInventory(
@@ -588,8 +693,7 @@ export class OrdersService {
         }
       }
 
-      lockedOrder.status = OrderStatus.CANCELLED;
-      return ordersRepo.save(lockedOrder);
+      return savedOrder;
     });
   }
 }
