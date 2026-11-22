@@ -15,7 +15,7 @@ Until those PRs merge into `develop`, build against the contract below; it will 
 ## 2. OpenAPI file
 
 - Committed at `docs/openapi.json` (59 paths, 85 operations, bearer scheme defined).
-- Regenerate after any backend change: `cd backend && pnpm openapi:export` (no database needed).
+- Regenerate after any backend change: `cd backend && pnpm openapi:export` (no database needed). Use `pnpm openapi:export <path>` for a custom output path.
 - Live copy while the backend runs: `http://localhost:4000/api/docs` (UI) and `/api/docs-json` (raw). The UI now has an **Authorize** button; paste an access token.
 - Auth endpoints now document their real response shape (`AuthResponseDto`).
 

@@ -15,6 +15,8 @@ export interface GetProductOutput {
   unit: string | null;
   sellingPrice: string;
   costPrice: string | null;
+  currency: 'NGN';
+  amountUnit: 'major';
   status: string;
 }
 
@@ -67,6 +69,8 @@ export function createGetProductTool(
         unit: { type: ['string', 'null'] },
         sellingPrice: { type: 'string' },
         costPrice: { type: ['string', 'null'] },
+        currency: { type: 'string', enum: ['NGN'] },
+        amountUnit: { type: 'string', enum: ['major'] },
         status: { type: 'string' },
       },
     },
@@ -90,6 +94,8 @@ export function createGetProductTool(
         unit: product.unit,
         sellingPrice: product.sellingPrice,
         costPrice: product.costPrice,
+        currency: 'NGN',
+        amountUnit: 'major',
         status: product.status,
       };
     },

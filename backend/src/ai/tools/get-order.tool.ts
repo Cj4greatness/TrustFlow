@@ -14,6 +14,8 @@ export interface GetOrderOutput {
   subtotal: string;
   discount: string;
   total: string;
+  currency: 'NGN';
+  amountUnit: 'major';
   notes: string | null;
 }
 
@@ -60,6 +62,8 @@ export function createGetOrderTool(
         subtotal: { type: 'string' },
         discount: { type: 'string' },
         total: { type: 'string' },
+        currency: { type: 'string', enum: ['NGN'] },
+        amountUnit: { type: 'string', enum: ['major'] },
         notes: { type: ['string', 'null'] },
       },
     },
@@ -82,6 +86,8 @@ export function createGetOrderTool(
         subtotal: order.subtotal,
         discount: order.discount,
         total: order.total,
+        currency: 'NGN',
+        amountUnit: 'major',
         notes: order.notes,
       };
     },

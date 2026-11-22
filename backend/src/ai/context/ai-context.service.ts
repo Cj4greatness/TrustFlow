@@ -82,6 +82,8 @@ export class AiContextService {
         customerName: customer.displayName,
         itemCount: items.length,
         total: order.total,
+        currency: 'NGN',
+        amountUnit: 'major',
       },
     };
   }
