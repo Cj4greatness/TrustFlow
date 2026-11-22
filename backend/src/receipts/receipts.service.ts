@@ -196,6 +196,91 @@ export class ReceiptsService {
 
     return this.createReceiptForPayment(paymentId, organizationId);
   }
+
+  async reconcileMissingReceipts(options?: {
+    limit?: number;
+    execute?: boolean;
+    organizationId?: string;
+  }): Promise<{
+    dryRun: boolean;
+    candidates: Array<{
+      paymentId: string;
+      organizationId: string;
+      invoiceId: string;
+    }>;
+    reconciled: string[];
+    skippedPaymentIds: string[];
+  }> {
+    const limit = Math.max(1, Math.min(10_000, options?.limit ?? 100));
+    const execute = options?.execute ?? false;
+
+    const candidates = await this.dataSource
+      .getRepository(Payment)
+      .createQueryBuilder('payment')
+      .leftJoin(
+        'receipts',
+        'receipt',
+        'receipt.organization_id = payment.organization_id AND receipt.payment_id = payment.id',
+      )
+      .select('payment.id', 'paymentId')
+      .addSelect('payment.organization_id', 'organizationId')
+      .addSelect('payment.invoice_id', 'invoiceId')
+      .where('payment.status = :status', { status: PaymentStatus.SUCCESS })
+      .andWhere('receipt.id IS NULL')
+      .andWhere(
+        options?.organizationId
+          ? 'payment.organization_id = :organizationId'
+          : '1 = 1',
+        options?.organizationId
+          ? { organizationId: options.organizationId }
+          : {},
+      )
+      .orderBy('payment.organization_id', 'ASC')
+      .addOrderBy('payment.confirmed_at', 'ASC')
+      .addOrderBy('payment.id', 'ASC')
+      .limit(limit)
+      .getRawMany<{
+        paymentId: string;
+        organizationId: string;
+        invoiceId: string;
+      }>();
+
+    if (!execute) {
+      return {
+        dryRun: true,
+        candidates,
+        reconciled: [],
+        skippedPaymentIds: [],
+      };
+    }
+
+    const reconciled: string[] = [];
+    const skippedPaymentIds: string[] = [];
+    for (const candidate of candidates) {
+      const existing = await this.receiptsRepository.findByPaymentId(
+        candidate.paymentId,
+        candidate.organizationId,
+      );
+      if (existing) {
+        skippedPaymentIds.push(candidate.paymentId);
+        continue;
+      }
+
+      await this.createReceiptForPayment(
+        candidate.paymentId,
+        candidate.organizationId,
+      );
+      reconciled.push(candidate.paymentId);
+    }
+
+    return {
+      dryRun: false,
+      candidates,
+      reconciled,
+      skippedPaymentIds,
+    };
+  }
+
   private async nextReceiptNumber(
     organizationId: string,
     manager: EntityManager,
