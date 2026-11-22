@@ -15,6 +15,7 @@ import { User, UserStatus } from '../users/entities/user.entity';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthResponse } from './types/auth-response.type';
 import { JwtPayload } from './types/jwt-payload.type';
+import { ACCOUNT_NOT_ACTIVE_ERROR } from './account-status';
 
 const RECENTLY_ROTATED_WINDOW_MS = 10_000;
 
@@ -136,10 +137,7 @@ export class AuthService {
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException({
-        message: 'Account is not active',
-        code: 'ACCOUNT_NOT_ACTIVE',
-      });
+      throw new ForbiddenException(ACCOUNT_NOT_ACTIVE_ERROR);
     }
 
     await this.usersRepository.updateLastLogin(user.id);
@@ -207,6 +205,14 @@ export class AuthService {
         throw new UnauthorizedException('Invalid or expired refresh token');
       }
       userId = user.id;
+
+      if (user.status !== UserStatus.ACTIVE) {
+        failure = {
+          reason: 'account_not_active',
+          classification: 'expected',
+        };
+        throw new ForbiddenException(ACCOUNT_NOT_ACTIVE_ERROR);
+      }
 
       if (!user.refreshTokenHash) {
         failure = {
