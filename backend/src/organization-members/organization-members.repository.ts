@@ -79,6 +79,8 @@ export class OrganizationMembersRepository {
   withTransaction(manager: EntityManager) {
     const transactionalRepo = manager.getRepository(OrganizationMember);
     return {
+      findByUser: (userId: string) =>
+        transactionalRepo.find({ where: { userId } }),
       lockOrganization: async (organizationId: string) => {
         const organization = await manager.getRepository(Organization).findOne({
           where: { id: organizationId },
@@ -115,6 +117,9 @@ export class OrganizationMembersRepository {
       update: (id: string, data: Partial<OrganizationMember>) =>
         transactionalRepo.update({ id }, data),
       removeMember: (id: string) => transactionalRepo.delete({ id }),
+      softDeleteByUser: async (userId: string) => {
+        await transactionalRepo.softDelete({ userId });
+      },
     };
   }
 }

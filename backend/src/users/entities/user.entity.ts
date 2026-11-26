@@ -57,6 +57,9 @@ export class User extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: true, name: 'last_login' })
   lastLogin: Date | null;
 
+  @Column({ type: 'timestamptz', nullable: true, name: 'session_started_at' })
+  sessionStartedAt: Date | null;
+
   /**
    * Hash of the current valid refresh token, enabling rotation
    * (each successful refresh replaces this with a new hash) and

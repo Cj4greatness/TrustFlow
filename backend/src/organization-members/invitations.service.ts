@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, QueryFailedError } from 'typeorm';
@@ -163,6 +164,15 @@ export class InvitationsService {
 
     try {
       await this.dataSource.transaction(async (manager) => {
+        const lockedAcceptingUser =
+          await this.usersRepository.findByIdForUpdate(
+            acceptingUserId,
+            manager,
+          );
+        if (!lockedAcceptingUser) {
+          throw new UnauthorizedException('User not found');
+        }
+
         const memberRepo =
           this.organizationMembersRepository.withTransaction(manager);
         const invitationRepo = manager.getRepository(Invitation);
