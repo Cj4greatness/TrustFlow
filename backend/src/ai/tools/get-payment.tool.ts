@@ -11,6 +11,7 @@ export interface GetPaymentOutput {
   invoiceId: string;
   amount: number;
   currency: string;
+  amountUnit: 'minor';
   method: string;
   providerReference: string | null;
   status: string;
@@ -63,6 +64,7 @@ export function createGetPaymentTool(
         invoiceId: { type: 'string' },
         amount: { type: 'number' },
         currency: { type: 'string' },
+        amountUnit: { type: 'string', enum: ['minor'] },
         method: { type: 'string' },
         providerReference: { type: ['string', 'null'] },
         status: { type: 'string' },
@@ -85,6 +87,7 @@ export function createGetPaymentTool(
         invoiceId: payment.invoiceId,
         amount: payment.amount,
         currency: payment.currency,
+        amountUnit: 'minor',
         method: payment.method,
         providerReference: payment.providerReference,
         status: payment.status,

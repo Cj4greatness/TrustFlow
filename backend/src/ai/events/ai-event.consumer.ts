@@ -1,12 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-
-interface PaymentSucceededEvent {
-  paymentId: string;
-  invoiceId: string;
-  organizationId: string;
-  amount: string;
-}
+import type { PaymentSucceededEvent } from '../../events/payment-succeeded.event';
 
 /**
  * AiEventConsumer

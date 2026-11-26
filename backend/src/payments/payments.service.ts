@@ -11,6 +11,7 @@ import { Invoice } from '../invoices/entities/invoice.entity';
 import { PaymentsRepository } from './payments.repository';
 import { InvoicesService } from '../invoices/invoices.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { PaymentSucceededEvent } from '../events/payment-succeeded.event';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 
@@ -121,12 +122,15 @@ export class PaymentsService {
       throw err;
     }
 
-    this.eventEmitter.emit('payment.succeeded', {
+    const event: PaymentSucceededEvent = {
       paymentId: result.id,
       invoiceId: result.invoiceId,
       organizationId: result.organizationId,
       amount: result.amount,
-    });
+      currency: result.currency,
+      amountUnit: 'minor',
+    };
+    this.eventEmitter.emit('payment.succeeded', event);
 
     return result;
   }

@@ -36,6 +36,8 @@ import { createGetDeliveryTool } from './tools/get-delivery.tool';
 import { createGetProductTool } from './tools/get-product.tool';
 import { createGetPaymentTool } from './tools/get-payment.tool';
 import { AppConfig } from '../config/configuration';
+import { OrganizationsModule } from '../organizations/organizations.module';
+import { OrganizationsService } from '../organizations/organizations.service';
 
 /**
  * AiModule
@@ -68,6 +70,7 @@ import { AppConfig } from '../config/configuration';
     forwardRef(() => DeliveriesModule),
     forwardRef(() => ProductsModule),
     forwardRef(() => PaymentsModule),
+    OrganizationsModule,
   ],
   providers: [
     AiUsageService,
@@ -110,15 +113,20 @@ export class AiModule implements OnModuleInit {
     private readonly deliveriesService: DeliveriesService,
     private readonly productsService: ProductsService,
     private readonly paymentsService: PaymentsService,
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   onModuleInit(): void {
     this.aiToolRegistry.register(createGetCustomerTool(this.customersService));
-    this.aiToolRegistry.register(createGetOrderTool(this.ordersService));
+    this.aiToolRegistry.register(
+      createGetOrderTool(this.ordersService, this.organizationsService),
+    );
     this.aiToolRegistry.register(createGetInvoiceTool(this.invoicesService));
     this.aiToolRegistry.register(createGetSupplierTool(this.suppliersService));
     this.aiToolRegistry.register(createGetDeliveryTool(this.deliveriesService));
-    this.aiToolRegistry.register(createGetProductTool(this.productsService));
+    this.aiToolRegistry.register(
+      createGetProductTool(this.productsService, this.organizationsService),
+    );
     this.aiToolRegistry.register(createGetPaymentTool(this.paymentsService));
   }
 }

@@ -9,8 +9,8 @@ import { buildOpenApiDocument } from './swagger';
  * connecting to Postgres/Redis (Nest "preview" mode builds the route
  * graph but instantiates no providers).
  *
- *   pnpm openapi:export            -> ../docs/openapi.json
- *   pnpm openapi:export -- <path>  -> custom path
+ *   pnpm openapi:export             -> ../docs/openapi.json
+ *   pnpm openapi:export <path>       -> custom path
  */
 async function exportOpenApi() {
   const app = await NestFactory.create(AppModule, {
@@ -19,7 +19,8 @@ async function exportOpenApi() {
     abortOnError: false,
   });
   const document = buildOpenApiDocument(app);
-  const out = resolve(process.argv[2] ?? '../docs/openapi.json');
+  const args = process.argv.slice(2).filter((arg) => arg !== '--');
+  const out = resolve(args[0] ?? '../docs/openapi.json');
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(document, null, 2) + '\n');
   console.log(

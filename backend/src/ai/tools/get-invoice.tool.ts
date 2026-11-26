@@ -21,6 +21,7 @@ export interface GetInvoiceOutput {
   amountPaid: number;
   amountDue: number;
   currency: string;
+  amountUnit: 'minor';
   notes: string | null;
 }
 
@@ -76,6 +77,7 @@ export function createGetInvoiceTool(
         amountPaid: { type: 'number' },
         amountDue: { type: 'number' },
         currency: { type: 'string' },
+        amountUnit: { type: 'string', enum: ['minor'] },
         notes: { type: ['string', 'null'] },
       },
     },
@@ -105,6 +107,7 @@ export function createGetInvoiceTool(
         amountPaid: invoice.amountPaid,
         amountDue: invoice.amountDue,
         currency: invoice.currency,
+        amountUnit: 'minor',
         notes: invoice.notes,
       };
     },

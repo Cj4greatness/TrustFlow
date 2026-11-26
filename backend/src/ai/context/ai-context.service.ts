@@ -3,6 +3,7 @@ import { AiContextRequest, AiAssembledContext } from './ai-context.types';
 import { OrdersService } from '../../orders/orders.service';
 import { CustomersService } from '../../customers/customers.service';
 import { InventoryRepository } from '../../products/inventory.repository';
+import { OrganizationsService } from '../../organizations/organizations.service';
 
 /**
  * AiContextService
@@ -27,6 +28,7 @@ export class AiContextService {
     private readonly ordersService: OrdersService,
     private readonly customersService: CustomersService,
     private readonly inventoryRepository: InventoryRepository,
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   async assemble(request: AiContextRequest): Promise<AiAssembledContext> {
@@ -73,6 +75,9 @@ export class AiContextService {
       request.organizationId,
       orderId,
     );
+    const organization = await this.organizationsService.findById(
+      request.organizationId,
+    );
 
     return {
       operation: 'order_summary',
@@ -82,6 +87,8 @@ export class AiContextService {
         customerName: customer.displayName,
         itemCount: items.length,
         total: order.total,
+        currency: organization.currency,
+        amountUnit: 'major',
       },
     };
   }

@@ -13,15 +13,9 @@ import { ReceiptsRepository } from './receipts.repository';
 import { ReceiptSettingsService } from '../receipt-settings/receipt-settings.service';
 import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
+import type { PaymentSucceededEvent } from '../events/payment-succeeded.event';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
-
-interface PaymentSucceededEvent {
-  paymentId: string;
-  invoiceId: string;
-  organizationId: string;
-  amount: number;
-}
 
 /**
  * ReceiptsService
