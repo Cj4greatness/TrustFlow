@@ -1,5 +1,6 @@
 import { ProductsService } from '../../products/products.service';
 import { Permission } from '../../authorization/permissions.enum';
+import { OrganizationsService } from '../../organizations/organizations.service';
 import { AiTool, AiExecutionContext } from './ai-tool.interface';
 
 export interface GetProductInput {
@@ -15,7 +16,8 @@ export interface GetProductOutput {
   unit: string | null;
   sellingPrice: string;
   costPrice: string | null;
-  currency: 'NGN';
+  currency: string;
+  /** Decimal major units; invoices and payments use integer minor units. */
   amountUnit: 'major';
   status: string;
 }
@@ -46,6 +48,7 @@ export interface GetProductOutput {
  */
 export function createGetProductTool(
   productsService: ProductsService,
+  organizationsService: OrganizationsService,
 ): AiTool<GetProductInput, GetProductOutput> {
   return {
     name: 'get_product',
@@ -69,7 +72,7 @@ export function createGetProductTool(
         unit: { type: ['string', 'null'] },
         sellingPrice: { type: 'string' },
         costPrice: { type: ['string', 'null'] },
-        currency: { type: 'string', enum: ['NGN'] },
+        currency: { type: 'string' },
         amountUnit: { type: 'string', enum: ['major'] },
         status: { type: 'string' },
       },
@@ -85,6 +88,9 @@ export function createGetProductTool(
         ctx.organizationId,
         input.productId,
       );
+      const organization = await organizationsService.findById(
+        ctx.organizationId,
+      );
       return {
         id: product.id,
         name: product.name,
@@ -94,7 +100,7 @@ export function createGetProductTool(
         unit: product.unit,
         sellingPrice: product.sellingPrice,
         costPrice: product.costPrice,
-        currency: 'NGN',
+        currency: organization.currency,
         amountUnit: 'major',
         status: product.status,
       };

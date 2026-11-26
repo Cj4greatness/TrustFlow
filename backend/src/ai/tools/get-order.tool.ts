@@ -1,5 +1,6 @@
 import { OrdersService } from '../../orders/orders.service';
 import { Permission } from '../../authorization/permissions.enum';
+import { OrganizationsService } from '../../organizations/organizations.service';
 import { AiTool, AiExecutionContext } from './ai-tool.interface';
 
 export interface GetOrderInput {
@@ -14,7 +15,8 @@ export interface GetOrderOutput {
   subtotal: string;
   discount: string;
   total: string;
-  currency: 'NGN';
+  currency: string;
+  /** Decimal major units; invoices and payments use integer minor units. */
   amountUnit: 'major';
   notes: string | null;
 }
@@ -40,6 +42,7 @@ export interface GetOrderOutput {
  */
 export function createGetOrderTool(
   ordersService: OrdersService,
+  organizationsService: OrganizationsService,
 ): AiTool<GetOrderInput, GetOrderOutput> {
   return {
     name: 'get_order',
@@ -62,7 +65,7 @@ export function createGetOrderTool(
         subtotal: { type: 'string' },
         discount: { type: 'string' },
         total: { type: 'string' },
-        currency: { type: 'string', enum: ['NGN'] },
+        currency: { type: 'string' },
         amountUnit: { type: 'string', enum: ['major'] },
         notes: { type: ['string', 'null'] },
       },
@@ -78,6 +81,9 @@ export function createGetOrderTool(
         ctx.organizationId,
         input.orderId,
       );
+      const organization = await organizationsService.findById(
+        ctx.organizationId,
+      );
       return {
         id: order.id,
         orderNumber: order.orderNumber,
@@ -86,7 +92,7 @@ export function createGetOrderTool(
         subtotal: order.subtotal,
         discount: order.discount,
         total: order.total,
-        currency: 'NGN',
+        currency: organization.currency,
         amountUnit: 'major',
         notes: order.notes,
       };

@@ -15,10 +15,14 @@ import { InventoryService } from '../../src/products/inventory.service';
 import { InventoryMovementType } from '../../src/products/entities/inventory-movement.entity';
 import { OrdersService } from '../../src/orders/orders.service';
 import { InvoicesService } from '../../src/invoices/invoices.service';
+import { Organization } from '../../src/organizations/entities/organization.entity';
 import { Receipt } from '../../src/receipts/entities/receipt.entity';
 import { AiToolRegistry } from '../../src/ai/tools/ai-tool.registry';
 import { AiContextService } from '../../src/ai/context/ai-context.service';
-import { OrganizationRole } from '../../src/organization-members/entities/organization-member.entity';
+import {
+  OrganizationMember,
+  OrganizationRole,
+} from '../../src/organization-members/entities/organization-member.entity';
 import { PaymentSucceededEvent } from '../../src/events/payment-succeeded.event';
 
 describe('PR-C — payment and AI money contracts (e2e)', () => {
@@ -240,6 +244,9 @@ describe('PR-C — payment and AI money contracts (e2e)', () => {
     expect(order.total).toEqual(expect.any(String));
     expect(order.currency).toBe('NGN');
     expect(order.amountUnit).toBe('major');
+    expect(order.subtotal).toBe('1000.00');
+    expect(order.discount).toBe('0.00');
+    expect(order.total).toBe('1000.00');
 
     const product = (await registry.execute(
       'get_product',
@@ -260,6 +267,7 @@ describe('PR-C — payment and AI money contracts (e2e)', () => {
     expect(product.costPrice).toBeNull();
     expect(product.currency).toBe('NGN');
     expect(product.amountUnit).toBe('major');
+    expect(product.sellingPrice).toBe('1000.00');
 
     const aiContextService = app.get<AiContextService>(AiContextService);
     const context = await aiContextService.assemble({
@@ -272,5 +280,121 @@ describe('PR-C — payment and AI money contracts (e2e)', () => {
     expect(typeof context.data.total).toBe('string');
     expect(context.data.currency).toBe('NGN');
     expect(context.data.amountUnit).toBe('major');
+    expect(context.data.total).toBe('1000.00');
+  });
+
+  it('labels legacy USD organization order and product amounts with USD without changing amounts', async () => {
+    const organizationRepository = dataSource.getRepository(Organization);
+    const legacyOrganization = await organizationRepository.save(
+      organizationRepository.create({
+        name: `Legacy USD PR-C ${runId}`,
+        slug: `legacy-usd-pr-c-${runId}`,
+        country: 'United States',
+        currency: 'USD',
+      }),
+    );
+    await dataSource.getRepository(OrganizationMember).save({
+      organizationId: legacyOrganization.id,
+      userId,
+      role: OrganizationRole.OWNER,
+      joinedAt: new Date(),
+      invitedBy: null,
+    });
+
+    const customer = await app.get(CustomersService).createCustomer(
+      legacyOrganization.id,
+      {
+        customerType: 'individual',
+        firstName: 'Legacy',
+        lastName: 'USD',
+      } as never,
+      userId,
+    );
+    const legacyProduct = await app.get(ProductsService).createProduct(
+      legacyOrganization.id,
+      {
+        name: 'Legacy USD Widget',
+        sku: `USD-${runId}`,
+        sellingPrice: 250,
+      },
+      userId,
+    );
+    const ordersService = app.get(OrdersService);
+    const legacyOrder = await ordersService.createOrder(
+      legacyOrganization.id,
+      { customerId: customer.id },
+      userId,
+    );
+    await ordersService.addOrderItem(legacyOrganization.id, legacyOrder.id, {
+      productId: legacyProduct.id,
+      quantity: 1,
+    });
+
+    const registry = app.get(AiToolRegistry);
+    const executionContext = {
+      organizationId: legacyOrganization.id,
+      memberId: userId,
+      role: OrganizationRole.OWNER,
+      requestId: randomUUID(),
+    };
+    const order = (await registry.execute(
+      'get_order',
+      { orderId: legacyOrder.id },
+      executionContext,
+    )) as {
+      subtotal: string;
+      discount: string;
+      total: string;
+      currency: string;
+      amountUnit: string;
+    };
+    expect(order).toEqual(
+      expect.objectContaining({
+        subtotal: '250.00',
+        discount: '0.00',
+        total: '250.00',
+        currency: 'USD',
+        amountUnit: 'major',
+      }),
+    );
+
+    const product = (await registry.execute(
+      'get_product',
+      { productId: legacyProduct.id },
+      executionContext,
+    )) as {
+      sellingPrice: string;
+      currency: string;
+      amountUnit: string;
+    };
+    expect(product).toEqual(
+      expect.objectContaining({
+        sellingPrice: '250.00',
+        currency: 'USD',
+        amountUnit: 'major',
+      }),
+    );
+
+    const context = await app.get<AiContextService>(AiContextService).assemble({
+      organizationId: legacyOrganization.id,
+      memberId: userId,
+      role: OrganizationRole.OWNER,
+      operation: 'order_summary',
+      params: { orderId: legacyOrder.id },
+    });
+    expect(context.data.total).toBe('250.00');
+    expect(context.data.currency).toBe('USD');
+    expect(context.data.amountUnit).toBe('major');
+
+    await expect(
+      registry.execute(
+        'get_order',
+        { orderId },
+        {
+          ...executionContext,
+          requestId: randomUUID(),
+        },
+      ),
+    ).rejects.toThrow();
   });
 });
