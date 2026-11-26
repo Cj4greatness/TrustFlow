@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { OrganizationsRepository } from './organizations.repository';
 import { OrganizationMembersRepository } from '../organization-members/organization-members.repository';
@@ -8,6 +12,7 @@ import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
 import { Organization } from './entities/organization.entity';
 import { OrganizationRole } from '../organization-members/entities/organization-member.entity';
+import { UsersRepository } from '../users/users.repository';
 
 @Injectable()
 export class OrganizationsService {
@@ -16,6 +21,7 @@ export class OrganizationsService {
     private readonly organizationsRepository: OrganizationsRepository,
     private readonly organizationMembersRepository: OrganizationMembersRepository,
     private readonly slugService: SlugService,
+    private readonly usersRepository: UsersRepository,
   ) {}
 
   /**
@@ -32,6 +38,14 @@ export class OrganizationsService {
     creatorUserId: string,
   ): Promise<OrganizationResponseDto> {
     const organization = await this.dataSource.transaction(async (manager) => {
+      const creator = await this.usersRepository.findByIdForUpdate(
+        creatorUserId,
+        manager,
+      );
+      if (!creator) {
+        throw new UnauthorizedException('User not found');
+      }
+
       const orgRepo = this.organizationsRepository.withTransaction(manager);
       const memberRepo =
         this.organizationMembersRepository.withTransaction(manager);

@@ -19,7 +19,7 @@ import { AuditModule } from '../audit/audit.module';
     TypeOrmModule.forFeature([OrganizationMember, Invitation]),
     EmailModule,
     forwardRef(() => OrganizationsModule),
-    UsersModule,
+    forwardRef(() => UsersModule),
     forwardRef(() => AuthorizationModule),
     AuditModule,
   ],
