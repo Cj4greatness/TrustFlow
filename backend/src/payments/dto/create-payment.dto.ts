@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   MaxLength,
 } from 'class-validator';
 
@@ -21,7 +22,8 @@ import {
  * (organizations/:id/invoices/:invoiceId/payments), same convention
  * as CreateOrderItemDto not carrying orderId.
  *
- * amount is in kobo (integer, matches Invoice's convention).
+ * amount is in kobo (integer, matches Invoice's convention) and is
+ * capped at Number.MAX_SAFE_INTEGER so JSON numbers remain exact.
  *
  * No `method` field — v1 has exactly one PaymentMethod (MANUAL).
  */
@@ -33,6 +35,7 @@ export class CreatePaymentDto {
 
   @IsInt()
   @IsPositive()
+  @Max(Number.MAX_SAFE_INTEGER)
   amount: number;
 
   @IsOptional()
